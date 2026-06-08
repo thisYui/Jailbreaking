@@ -1,0 +1,358 @@
+\documentclass[12pt,a4paper]{article}
+
+% ================== PACKAGES ==================
+\usepackage[margin=2.54cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{lmodern}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xurl}
+\usepackage{float}
+\usepackage{tocloft}
+\usepackage{csquotes}
+\usepackage{tikz}
+\usepackage{caption}
+
+\usetikzlibrary{
+    arrows.meta,
+    positioning,
+    calc,
+    matrix,
+    decorations.pathreplacing
+}
+
+% ================== REFERENCES ==================
+\usepackage[
+    backend=biber,
+    style=ieee,
+    sorting=none
+]{biblatex}
+
+\addbibresource{references.bib}
+
+% ================== FONT & SPACING ==================
+\onehalfspacing
+\setlength{\emergencystretch}{3em}
+
+% ================== PARAGRAPH FORMAT ==================
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+% ================== HYPERREF SETUP ==================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=cyan,
+    pdftitle={
+        Jailbreaking Large Language Models and Agentic Systems:
+        Attacks, Defenses, and Evaluations
+    },
+    pdfauthor={Group 07}
+}
+
+% ================== HEADER & FOOTER ==================
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{ICML 2025 Tutorial}
+\rhead{Jailbreaking LLMs}
+\rfoot{Trang \thepage}
+
+\setlength{\headheight}{15pt}
+
+% ================== TITLE FORMAT ==================
+\titleformat{\section}
+    {\Large\bfseries}
+    {\thesection}
+    {1em}
+    {}
+
+\titleformat{\subsection}
+    {\large\bfseries}
+    {\thesubsection}
+    {1em}
+    {}
+
+\titleformat{\subsubsection}
+    {\normalsize\bfseries}
+    {\thesubsubsection}
+    {1em}
+    {}
+
+% ================== LISTING SETUP ==================
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    tabsize=4
+}
+
+% ================== CUSTOM COMMANDS ==================
+\newcommand{\abbr}[2]{#1 & #2 \\}
+\newcommand{\method}[1]{\textsc{#1}}
+\newcommand{\modelname}[1]{\texttt{#1}}
+
+% ================== VIETNAMESE NAMES ==================
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\listfigurename}{Danh mục hình vẽ}
+\renewcommand{\listtablename}{Danh mục bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\appendixname}{Phụ lục}
+
+% ================== DOCUMENT ==================
+\begin{document}
+
+% ================== TITLE PAGE ==================
+\begin{titlepage}
+\begin{center}
+
+{\large
+ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH\\
+TRƯỜNG ĐẠI HỌC KHOA HỌC TỰ NHIÊN\\
+KHOA CÔNG NGHỆ THÔNG TIN
+}\\[2.5cm]
+
+\includegraphics[width=4cm]{logo-khtn.png}\\[1.2cm]
+
+{\color{blue}\LARGE\textbf{ĐỒ ÁN 3}}\\[0.6cm]
+
+{\LARGE\textbf{
+JAILBREAKING LARGE LANGUAGE MODELS AND AGENTIC SYSTEMS
+}}\\[2.5cm]
+
+
+\begin{tabular}{ll}
+\textbf{Mã số sinh viên} & \textbf{Họ và tên} \\[0.2cm]
+23120245 & Nguyễn Quang Duy \\
+23120258 & Lưu Trọng Hiếu \\
+23120260 & Văn Đình Hiếu \\
+\end{tabular}
+
+\vfill
+
+\begin{tabular}{ll}
+\textbf{Giảng viên hướng dẫn:}
+    & TS. Bùi Tiến Lên \\
+    & ThS. Lê Nhựt Nam \\
+\end{tabular}
+
+\vfill
+
+
+\vspace{0.5cm}
+\textbf{Môn học:} & Nhập môn Học máy \\
+\textbf{Thành phố Hồ Chí Minh -- 2026}
+
+\end{center}
+\end{titlepage}
+
+% ================== FRONT MATTER ==================
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+% ================== ABSTRACT ==================
+\section*{Tóm tắt}
+\addcontentsline{toc}{section}{Tóm tắt}
+
+Sự phát triển nhanh chóng của các mô hình ngôn ngữ lớn
+(Large Language Models -- LLMs) đã thúc đẩy việc ứng dụng trí tuệ
+nhân tạo vào nhiều lĩnh vực như trợ lý hội thoại, hỗ trợ lập trình,
+tìm kiếm thông tin, tự động hóa quy trình và các hệ thống tác tử có
+khả năng sử dụng công cụ. Cùng với sự mở rộng về năng lực, vấn đề
+bảo đảm mô hình tuân thủ các nguyên tắc an toàn và không tạo ra hành
+vi ngoài mong muốn trở thành một yêu cầu quan trọng. Tuy nhiên, các
+cơ chế căn chỉnh an toàn hiện nay vẫn có thể bị vượt qua bởi các kỹ
+thuật jailbreaking, trong đó đầu vào được xây dựng hoặc tối ưu nhằm
+khiến mô hình không tuân theo những ràng buộc an toàn đã được thiết lập.
+
+Báo cáo này tổng hợp nội dung của tutorial
+\textit{Jailbreaking LLMs and Agentic Systems: Attacks, Defenses,
+and Evaluations}. Trước hết, báo cáo trình bày kiến thức nền về mô hình
+ngôn ngữ lớn, instruction tuning, alignment và threat model trong
+nghiên cứu an toàn mô hình. Tiếp theo, các phương pháp jailbreak được
+hệ thống hóa theo quyền truy cập của kẻ tấn công, mức độ tự động hóa,
+cơ chế tìm kiếm và số lượt tương tác. Các hướng phòng thủ được phân
+loại theo vị trí triển khai, bao gồm xử lý đầu vào, điều chỉnh mô hình,
+phòng thủ trong quá trình suy luận, kiểm duyệt đầu ra và bảo vệ ở cấp
+hệ thống.
+
+Báo cáo đồng thời khảo sát các benchmark và tiêu chí đánh giá như
+Attack Success Rate, refusal rate, over-refusal rate và benign utility.
+Ngoài các chatbot dựa trên văn bản, báo cáo mở rộng phân tích sang
+agentic systems và robot được điều khiển bởi LLM, nơi một cuộc tấn công
+thành công có thể không chỉ thay đổi nội dung phản hồi mà còn tác động
+đến quá trình lập kế hoạch, gọi công cụ và thực hiện hành động. Cuối
+cùng, nhóm trình bày thiết kế demo thực nghiệm nhằm so sánh một số
+phương pháp tấn công và phòng thủ trong môi trường kiểm soát, đồng thời
+phân tích sự đánh đổi giữa độ an toàn, khả năng hữu ích và chi phí tính
+toán của hệ thống.
+
+\textbf{Từ khóa:}
+mô hình ngôn ngữ lớn, jailbreaking, alignment, an toàn trí tuệ nhân tạo,
+adversarial attack, jailbreak defense, automated red teaming,
+agentic systems.
+
+\newpage
+
+% ================== TABLE OF CONTENTS ==================
+\tableofcontents
+\newpage
+
+% ================== ABBREVIATIONS ==================
+\section*{Danh mục từ viết tắt}
+\addcontentsline{toc}{section}{Danh mục từ viết tắt}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{
+    >{\bfseries}p{0.20\textwidth}
+    X
+}
+\toprule
+\textbf{Từ viết tắt} & \textbf{Ý nghĩa} \\
+\midrule
+
+AI
+& Artificial Intelligence -- Trí tuệ nhân tạo \\
+
+API
+& Application Programming Interface -- Giao diện lập trình ứng dụng \\
+
+ASR
+& Attack Success Rate -- Tỷ lệ tấn công thành công \\
+
+GCG
+& Greedy Coordinate Gradient \\
+
+ICML
+& International Conference on Machine Learning \\
+
+LLM
+& Large Language Model -- Mô hình ngôn ngữ lớn \\
+
+MLLM
+& Multimodal Large Language Model -- Mô hình ngôn ngữ lớn đa phương thức \\
+
+PAIR
+& Prompt Automatic Iterative Refinement \\
+
+ReAct
+& Reasoning and Acting \\
+
+RLHF
+& Reinforcement Learning from Human Feedback \\
+
+SFT
+& Supervised Fine-Tuning \\
+
+TAP
+& Tree of Attacks with Pruning \\
+
+TDC
+& Trojan Detection Challenge \\
+
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\newpage
+
+% ================== LIST OF FIGURES ==================
+\phantomsection
+\addcontentsline{toc}{section}{Danh mục hình vẽ}
+\listoffigures
+\newpage
+
+% ================== LIST OF TABLES ==================
+\phantomsection
+\addcontentsline{toc}{section}{Danh mục bảng}
+\listoftables
+\newpage
+
+% ================== MAIN MATTER ==================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_jailbreak_attacks}
+\input{sections/04_jailbreak_defenses}
+\input{sections/05_evaluation_benchmarks}
+\input{sections/06_agentic_systems}
+\input{sections/07_related_papers}
+\input{sections/08_experiments}
+
+
+
+% =====================================================
+% CHAPTER 9: DISCUSSION
+% =====================================================
+\input{sections/09_discussion}
+
+% Nội dung dự kiến:
+% 9.1 Vì sao jailbreak vẫn tồn tại?
+% 9.2 Attack--defense arms race
+% 9.3 Safety--utility trade-off
+% 9.4 Chatbot và agentic systems
+% 9.5 Hạn chế của các benchmark hiện tại
+% 9.6 Khía cạnh đạo đức
+% 9.7 Hướng nghiên cứu tương lai
+
+% =====================================================
+% CHAPTER 10: CONCLUSION
+% =====================================================
+\input{sections/10_conclusion}
+
+% Nội dung dự kiến:
+% 10.1 Tổng kết nội dung
+% 10.2 Kết quả chính từ demo
+% 10.3 Hạn chế
+% 10.4 Kết luận chung
+
+% ================== APPENDIX ==================
+\clearpage
+\appendix
+\input{sections/appendix}
+
+% Nội dung dự kiến:
+% Phụ lục A: Cấu hình thực nghiệm
+% Phụ lục B: Bảng kết quả bổ sung
+% Phụ lục C: Hướng dẫn chạy demo
+% Phụ lục D: Phân công thành viên
+% Phụ lục E: Danh sách paper và tài nguyên
+
+% ================== REFERENCES ==================
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{Tài liệu tham khảo}
+
+% Bỏ dòng sau khi references.bib đã có đủ các tài liệu thực sự được trích dẫn.
+% \nocite{*}
+
+\printbibliography[
+    title={Tài liệu tham khảo}
+]
+
+\end{document}

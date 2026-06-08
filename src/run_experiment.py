@@ -19,8 +19,8 @@ from config import (
     DETAILED_RESULTS_CSV,
     ERROR_CASES_CSV,
     EXPERIMENT_SUMMARY_CSV,
-    GOOGLE_API_RAW_RESPONSES_JSONL,
     INPUT_CSV,
+    OPENROUTER_API_RAW_RESPONSES_JSONL,
     PROFILE_SUMMARY_CSV,
     RAW_LOGS_JSONL,
     RUN_MODES,
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--row-from", type=int, default=0, help="Start prompt row index, inclusive.")
     parser.add_argument("--row-to", type=int, default=None, help="End prompt row index, exclusive.")
-    parser.add_argument("--sleep-seconds", type=float, default=2.0, help="Seconds to sleep between Google API calls.")
+    parser.add_argument("--sleep-seconds", type=float, default=2.0, help="Seconds to sleep between API calls.")
     parser.add_argument("--export-only", action="store_true", help="Only export prompts for web_manual mode.")
     parser.add_argument("--responses", type=Path, default=WEB_MANUAL_RESPONSES_CSV)
     parser.add_argument(
@@ -241,13 +241,14 @@ def run_simulator(prompts_df: pd.DataFrame) -> tuple[list[dict], list[dict], lis
     return rows, attacked_rows, raw_logs
 
 
-def run_google_api(
+def run_openrouter_api(
     prompts_df: pd.DataFrame,
     sleep_seconds: float,
+    run_mode: str = "openrouter_api",
 ) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    from google_api_client import call_gemini, require_gemini_config
+    from openrouter_client import call_openrouter, require_openrouter_config
 
-    require_gemini_config()
+    require_openrouter_config()
     rows, attacked_rows, raw_logs, api_logs = [], [], [], []
     for source in prompts_df.to_dict("records"):
         for attack_type in ATTACK_TYPES:
@@ -258,7 +259,7 @@ def run_google_api(
                 category=source["category"],
                 risk_type=source["risk_type"],
             )
-            result = call_gemini(attacked_prompt)
+            result = call_openrouter(attacked_prompt)
             response_text = result.get("response_text", "")
             model_label = infer_label_from_response(response_text, source["expected_behavior"])
             attacked_rows.append(
@@ -272,11 +273,11 @@ def run_google_api(
                 **result,
             }
             api_logs.append(api_log)
-            raw_logs.append({"run_mode": "google_api", **api_log, "model_label": model_label})
+            raw_logs.append({"run_mode": run_mode, **api_log, "model_label": model_label})
             for defense_type in DEFENSE_TYPES:
                 add_detail(
                     rows,
-                    "google_api",
+                    run_mode,
                     source,
                     attack_type,
                     attack_profile,
@@ -376,9 +377,9 @@ def main() -> None:
     print(f"Loaded {len(prompts_df)} prompts")
     print(f"Row range: {args.row_from} to {args.row_to}")
     print(f"Limit: {args.limit}")
-    if args.mode == "google_api":
+    if args.mode == "openrouter_api":
         estimated_api_calls = len(prompts_df) * len(ATTACK_TYPES)
-        print(f"Estimated Google API calls: {estimated_api_calls}")
+        print(f"Estimated OpenRouter API calls: {estimated_api_calls}")
         print(f"Sleep between API calls: {args.sleep_seconds} seconds")
 
     if args.mode == "web_manual" and args.export_only:
@@ -389,9 +390,9 @@ def main() -> None:
 
     if args.mode == "simulator":
         rows, attacked_rows, raw_logs = run_simulator(prompts_df)
-    elif args.mode == "google_api":
-        rows, attacked_rows, raw_logs, api_logs = run_google_api(prompts_df, args.sleep_seconds)
-        write_jsonl(GOOGLE_API_RAW_RESPONSES_JSONL, api_logs)
+    elif args.mode == "openrouter_api":
+        rows, attacked_rows, raw_logs, api_logs = run_openrouter_api(prompts_df, args.sleep_seconds)
+        write_jsonl(OPENROUTER_API_RAW_RESPONSES_JSONL, api_logs)
     elif args.mode == "web_manual":
         rows, attacked_rows, raw_logs = run_web_manual(args.responses)
     else:

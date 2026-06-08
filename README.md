@@ -16,14 +16,14 @@ Project hỗ trợ ba chế độ chạy:
 
 ```text
 simulator
-google_api
+openrouter_api
 web_manual
 ```
 
 Trong đó:
 
 * `simulator`: dùng mô phỏng nội bộ, không gọi API thật.
-* `google_api`: gọi mô hình Gemini thông qua Google API.
+* `openrouter_api`: gọi mô hình riverflow-v2.5-fast:free thông qua OpenRouter API.
 * `web_manual`: export prompt để kiểm thử thủ công qua giao diện web.
 
 ---
@@ -42,7 +42,7 @@ project_root/
 │   ├── attacked_prompts.csv
 │   ├── detailed_results.csv
 │   ├── raw_logs.jsonl
-│   ├── google_api_raw_responses.jsonl
+│   ├── openrouter_api_raw_responses.jsonl
 │   └── web_manual_export.csv
 │
 ├── reports/
@@ -58,7 +58,7 @@ project_root/
 │   ├── attack_transforms.py
 │   ├── defenses.py
 │   ├── evaluator.py
-│   ├── google_api_client.py
+│   ├── openrouter_client.py
 │   ├── target_simulator.py
 │   ├── web_manual.py
 │   └── make_plots.py
@@ -78,19 +78,19 @@ Project dùng file `.env` để lưu cấu hình API và model. File này **khô
 Tạo file `.env` ở thư mục gốc project:
 
 ```env
-GEMINI_API_KEY=your_google_ai_studio_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_TEMPERATURE=0.0
-GEMINI_MAX_OUTPUT_TOKENS=512
+OPENROUTER_API=your_openrouter_api_key_here
+OPENROUTER_MODEL=riverflow-v2.5-fast:free
+OPENROUTER_TEMPERATURE=0.0
+OPENROUTER_MAX_OUTPUT_TOKENS=512
 ```
 
 Nên tạo thêm file `.env.example` để mô tả cấu hình cần thiết mà không chứa key thật:
 
 ```env
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_TEMPERATURE=0.0
-GEMINI_MAX_OUTPUT_TOKENS=512
+OPENROUTER_API=
+OPENROUTER_MODEL=riverflow-v2.5-fast:free
+OPENROUTER_TEMPERATURE=0.0
+OPENROUTER_MAX_OUTPUT_TOKENS=512
 ```
 
 ---
@@ -112,7 +112,7 @@ Kích hoạt môi trường trên Windows PowerShell:
 Cài thư viện cần thiết:
 
 ```bash
-pip install pandas matplotlib python-dotenv google-genai
+pip install pandas matplotlib python-dotenv
 ```
 
 Nếu dùng file `requirements.txt`, có thể cài bằng:
@@ -174,7 +174,7 @@ injection_style
 | `multi_turn_simulation` | Giả lập yêu cầu nhiều bước                                 |
 | `injection_style`       | Đưa prompt vào dạng external content hoặc prompt injection |
 
-Do mỗi prompt được chạy qua 5 attack types, số API calls trong chế độ `google_api` được tính như sau:
+Do mỗi prompt được chạy qua 5 attack types, số API calls trong chế độ `openrouter_api` được tính như sau:
 
 ```text
 Số API calls = số dòng prompt × 5
@@ -208,7 +208,7 @@ defense_in_depth
 | `output_moderation` | Chặn dựa trên nhãn hoặc nội dung phản hồi đầu ra |
 | `defense_in_depth`  | Kết hợp input filtering và output moderation     |
 
-Lưu ý: trong chế độ `google_api`, defense được chạy **offline** sau khi nhận phản hồi. Defense không làm tăng số API calls.
+Lưu ý: trong chế độ `openrouter_api`, defense được chạy **offline** sau khi nhận phản hồi. Defense không làm tăng số API calls.
 
 ---
 
@@ -234,14 +234,14 @@ python src/run_experiment.py --mode simulator --row-from 0 --row-to 5
 
 ---
 
-## 9. Chạy bằng Google API
+## 9. Chạy bằng OpenRouter API
 
-Trước khi chạy, cần chắc chắn file `.env` đã có `GEMINI_API_KEY`.
+Trước khi chạy, cần chắc chắn file `.env` đã có `OPENROUTER_API`.
 
 Chạy 5 dòng đầu tiên, nghỉ 5 giây giữa các API calls:
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 5 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
 ```
 
 Lệnh trên sẽ tạo:
@@ -253,24 +253,24 @@ Lệnh trên sẽ tạo:
 Chạy batch tiếp theo:
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 5 --row-to 10 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
 ```
 
 Chạy toàn bộ 30 dòng theo từng batch nhỏ:
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 5 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 5 --row-to 10 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 10 --row-to 15 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 15 --row-to 20 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 20 --row-to 25 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 25 --row-to 30 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 10 --row-to 15 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 15 --row-to 20 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 20 --row-to 25 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 25 --row-to 30 --sleep-seconds 5
 ```
 
 Nếu vẫn bị rate limit, giảm số dòng mỗi batch và tăng thời gian nghỉ:
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 2 --sleep-seconds 10
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 2 --sleep-seconds 10
 ```
 
 ---
@@ -283,7 +283,7 @@ Mỗi lần chạy, các file output mặc định sẽ bị ghi đè:
 outputs/attacked_prompts.csv
 outputs/detailed_results.csv
 outputs/raw_logs.jsonl
-outputs/google_api_raw_responses.jsonl
+outputs/openrouter_api_raw_responses.jsonl
 ```
 
 Vì vậy sau mỗi batch nên copy output sang file riêng.
@@ -291,22 +291,22 @@ Vì vậy sau mỗi batch nên copy output sang file riêng.
 Ví dụ trên Windows PowerShell:
 
 ```powershell
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 5 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
 
 Copy-Item outputs\detailed_results.csv outputs\detailed_results_0_5.csv
 Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_0_5.csv
-Copy-Item outputs\google_api_raw_responses.jsonl outputs\google_api_raw_responses_0_5.jsonl
+Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_0_5.jsonl
 Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_0_5.jsonl
 ```
 
 Batch tiếp theo:
 
 ```powershell
-python src/run_experiment.py --mode google_api --row-from 5 --row-to 10 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
 
 Copy-Item outputs\detailed_results.csv outputs\detailed_results_5_10.csv
 Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_5_10.csv
-Copy-Item outputs\google_api_raw_responses.jsonl outputs\google_api_raw_responses_5_10.jsonl
+Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_5_10.jsonl
 Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_5_10.jsonl
 ```
 
@@ -390,9 +390,9 @@ error
 
 Lưu log thô của quá trình chạy.
 
-### `outputs/google_api_raw_responses.jsonl`
+### `outputs/openrouter_api_raw_responses.jsonl`
 
-Lưu phản hồi thô từ Google API khi chạy `google_api`.
+Lưu phản hồi thô từ OpenRouter API khi chạy `openrouter_api`.
 
 ---
 
@@ -462,16 +462,16 @@ orr_by_profile.png
 python src/run_experiment.py --mode simulator --limit 30
 ```
 
-### Bước 2: Chạy thử Google API với batch nhỏ
+### Bước 2: Chạy thử OpenRouter API với batch nhỏ
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 2 --sleep-seconds 10
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 2 --sleep-seconds 10
 ```
 
 ### Bước 3: Nếu ổn, chạy theo batch 5 dòng
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 0 --row-to 5 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
 ```
 
 ### Bước 4: Lưu output batch
@@ -479,18 +479,18 @@ python src/run_experiment.py --mode google_api --row-from 0 --row-to 5 --sleep-s
 ```powershell
 Copy-Item outputs\detailed_results.csv outputs\detailed_results_0_5.csv
 Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_0_5.csv
-Copy-Item outputs\google_api_raw_responses.jsonl outputs\google_api_raw_responses_0_5.jsonl
+Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_0_5.jsonl
 Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_0_5.jsonl
 ```
 
 ### Bước 5: Chạy các batch tiếp theo
 
 ```bash
-python src/run_experiment.py --mode google_api --row-from 5 --row-to 10 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 10 --row-to 15 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 15 --row-to 20 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 20 --row-to 25 --sleep-seconds 5
-python src/run_experiment.py --mode google_api --row-from 25 --row-to 30 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 10 --row-to 15 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 15 --row-to 20 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 20 --row-to 25 --sleep-seconds 5
+python src/run_experiment.py --mode openrouter_api --row-from 25 --row-to 30 --sleep-seconds 5
 ```
 
 ### Bước 6: Tạo bảng và hình cho báo cáo

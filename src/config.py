@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 ATTACK_TYPES = ["none", "role_play", "obfuscation", "multi_turn_simulation", "injection_style"]
 ATTACK_PROFILES = ["knowledge", "company", "hazardous", "generic"]
 DEFENSE_TYPES = ["no_defense", "input_filter", "output_moderation", "defense_in_depth"]
-RUN_MODES = ["simulator", "google_api", "web_manual"]
+RUN_MODES = ["simulator", "openrouter_api", "web_manual"]
 
 ALLOWED_CATEGORIES = {"benign", "harmful", "borderline"}
 ALLOWED_EXPECTED_BEHAVIORS = {"answer", "refuse"}
@@ -32,7 +32,7 @@ WEB_MANUAL_RESPONSES_CSV = DATA_DIR / "web_manual_responses.csv"
 ATTACKED_PROMPTS_CSV = OUTPUT_DIR / "attacked_prompts.csv"
 DETAILED_RESULTS_CSV = OUTPUT_DIR / "detailed_results.csv"
 RAW_LOGS_JSONL = OUTPUT_DIR / "raw_logs.jsonl"
-GOOGLE_API_RAW_RESPONSES_JSONL = OUTPUT_DIR / "google_api_raw_responses.jsonl"
+OPENROUTER_API_RAW_RESPONSES_JSONL = OUTPUT_DIR / "openrouter_api_raw_responses.jsonl"
 WEB_MANUAL_EXPORT_CSV = OUTPUT_DIR / "web_manual_export.csv"
 EXPERIMENT_SUMMARY_CSV = REPORT_TABLE_DIR / "experiment_summary.csv"
 ATTACK_SUMMARY_CSV = REPORT_TABLE_DIR / "attack_summary.csv"

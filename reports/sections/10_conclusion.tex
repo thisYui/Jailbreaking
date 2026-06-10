@@ -1,0 +1,67 @@
+\section{Kết luận}
+\label{sec:conclusion}
+
+Báo cáo này đã trình bày tổng quan về bài toán jailbreaking trong các mô hình
+ngôn ngữ lớn, bao gồm nền tảng kỹ thuật, các dạng tấn công phổ biến, các hướng
+phòng thủ, phương pháp đánh giá, benchmark liên quan và rủi ro mở rộng trong
+các hệ thống agentic. Thông qua các phần tổng hợp lý thuyết, báo cáo cho thấy
+jailbreaking không chỉ là vấn đề của một prompt đơn lẻ, mà là một bài toán hệ
+thống liên quan đến instruction hierarchy, alignment, threat model, guardrail,
+evaluation và trade-off giữa safety và utility.
+
+Về mặt thực nghiệm, nhóm chọn hướng tự xây dựng demo từ đầu theo yêu cầu của
+đề tài. Demo không nhằm tái lập đầy đủ một phương pháp cụ thể như GCG, PAIR hay
+AutoDAN, mà tập trung cài đặt một pipeline nhỏ có kiểm soát gồm các thành phần
+chính được đề cập trong tutorial: attack transformations, defense
+configurations, evaluation metrics và visualization. Pipeline được áp dụng trên
+một tập prompt nhỏ gồm các nhóm \texttt{knowledge}, \texttt{company} và
+\texttt{hazardous}, sau đó đánh giá qua nhiều attack type và defense type khác
+nhau.
+
+Kết quả thực nghiệm cho thấy khi không có defense bổ sung, hệ thống vẫn tồn tại
+unsafe compliance với ASR bằng 0.133. Trong các defense được thử nghiệm,
+\texttt{output\_moderation} đạt trade-off tốt nhất: ASR giảm về 0.000 trong
+khi Utility Rate vẫn giữ ở mức 0.613. Ngược lại, \texttt{input\_filter} và
+\texttt{defense\_in\_depth} cũng giúp giảm ASR nhưng làm tăng over-refusal,
+đặc biệt ở nhóm \texttt{hazardous}. Điều này cho thấy một defense tốt không chỉ
+cần giảm unsafe compliance, mà còn phải hạn chế việc từ chối nhầm các yêu cầu
+hợp lệ.
+
+Một kết quả đáng chú ý khác là rủi ro không phân bố đều giữa các nhóm prompt.
+Nhóm \texttt{company} có ASR cao nhất khi không có defense, cho thấy các yêu
+cầu liên quan đến thông tin nội bộ, secret hoặc instruction hierarchy là nhóm
+cần được kiểm soát cẩn thận. Trong khi đó, nhóm \texttt{knowledge} không tạo ASR
+trong thí nghiệm này nhưng vẫn có over-refusal, phản ánh khó khăn của hệ thống
+trong việc phân biệt giữa thảo luận học thuật về jailbreak và yêu cầu gây hại
+thực sự.
+
+Bên cạnh experiment chính, nhóm cũng thực hiện manual web evaluation như một
+phân tích bổ sung. Phần này tổng hợp các nhãn \texttt{Passed\_*} từ dữ liệu
+manual và không được gộp vào các metric chính như ASR, ORR hoặc Utility Rate.
+Kết quả manual giúp xác định các case cần đọc sâu hơn, nhưng không được xem là
+bằng chứng định lượng thay thế cho pipeline đánh giá chính.
+
+Do hạn chế về tài nguyên tính toán, quota API và thời gian thực hiện, thí
+nghiệm trong báo cáo có phạm vi giới hạn. Bộ prompt còn nhỏ, target model chính
+được gọi thông qua OpenRouter API, evaluator hiện tại là rule-based, và các
+defense mới chỉ ở mức minh họa. Vì vậy, các kết quả không nên được hiểu như kết
+luận tổng quát về mọi mô hình hoặc mọi dạng jailbreak. Giá trị chính của demo
+nằm ở việc minh họa được quy trình đánh giá, cách đo lường safety--utility
+trade-off, và các dạng lỗi thường gặp như unsafe compliance và over-refusal.
+
+Trong tương lai, có thể mở rộng công việc theo nhiều hướng. Thứ nhất, dataset
+cần được mở rộng bằng các benchmark công khai và nhiều nhóm rủi ro hơn. Thứ
+hai, evaluator nên được cải thiện bằng human evaluation, LLM-as-a-judge hoặc
+guard model chuyên dụng. Thứ ba, pipeline nên được chạy trên nhiều target model
+để so sánh độ bền của từng mô hình. Thứ tư, có thể tích hợp các defense mạnh
+hơn được đề cập trong tutorial, chẳng hạn smoothing, adversarial training,
+circuit breaker hoặc contextual moderation. Cuối cùng, hướng mở rộng quan trọng
+là đánh giá jailbreak trong agentic systems, nơi prompt injection có thể ảnh
+hưởng đến tool-use, memory, retrieval và workflow nhiều bước.
+
+Tổng kết lại, báo cáo cho thấy jailbreaking là một bài toán đánh giá an toàn
+phức tạp, cần được tiếp cận theo hướng hệ thống. Một mô hình hoặc ứng dụng LLM
+không thể được xem là an toàn chỉ vì có tỷ lệ từ chối cao, cũng không thể được
+xem là hữu ích nếu bỏ qua rủi ro unsafe compliance. Đánh giá jailbreak cần cân
+bằng giữa ba mục tiêu: giảm khả năng làm theo yêu cầu nguy hiểm, hạn chế
+over-refusal và duy trì utility cho các yêu cầu hợp lệ.

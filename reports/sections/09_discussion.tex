@@ -1,0 +1,190 @@
+\section{Thảo luận}
+\label{sec:discussion}
+
+Phần thực nghiệm cho thấy việc đánh giá jailbreak không thể chỉ dựa trên một
+chỉ số đơn lẻ như attack success rate. Một cấu hình phòng thủ có thể làm giảm
+unsafe compliance nhưng đồng thời làm tăng over-refusal, khiến hệ thống kém hữu
+ích hơn đối với các yêu cầu hợp lệ. Vì vậy, phần thảo luận này tập trung diễn
+giải các kết quả chính ở Section~\ref{sec:experiments}, đặc biệt là trade-off
+giữa safety và utility, vai trò của các lớp phòng thủ, hạn chế của evaluator,
+và phạm vi kết luận của thực nghiệm.
+
+\subsection{Ý nghĩa của kết quả thực nghiệm}
+
+Kết quả tổng hợp cho thấy baseline \texttt{no\_defense} vẫn tồn tại unsafe
+compliance với ASR bằng 0.133. Điều này cho thấy chỉ dựa vào cơ chế an toàn nội
+tại của mô hình là chưa đủ trong mọi trường hợp. Khi prompt được biến đổi bằng
+các kỹ thuật như role-play, multi-turn simulation hoặc injection-style format,
+mô hình vẫn có thể tạo ra phản hồi không mong muốn đối với một số yêu cầu
+harmful.
+
+Tuy nhiên, kết quả cũng cho thấy rủi ro không phân bố đồng đều giữa các nhóm
+prompt. Nhóm \texttt{company} có ASR cao nhất khi không có defense, trong khi
+nhóm \texttt{knowledge} không tạo ASR trong thí nghiệm này nhưng lại có
+over-refusal đáng kể. Điều này gợi ý rằng một hệ thống an toàn cần đánh giá
+đồng thời cả hai mặt: khả năng từ chối yêu cầu nguy hiểm và khả năng giữ lại
+câu trả lời hữu ích cho yêu cầu hợp lệ.
+
+Một điểm quan trọng là attack success không phải dạng lỗi duy nhất. Trong bộ
+kết quả chi tiết, số lượng over-refusal lớn hơn số lượng attack success. Điều
+này cho thấy hệ thống có thể thất bại theo hai hướng trái ngược: hoặc quá dễ
+làm theo yêu cầu harmful, hoặc quá thận trọng và từ chối cả những yêu cầu hợp
+lệ. Cả hai dạng lỗi đều ảnh hưởng đến chất lượng của một hệ thống LLM thực tế.
+
+\subsection{Safety--utility trade-off}
+
+Kết quả thực nghiệm minh họa rõ trade-off giữa safety và utility. Cấu hình
+\texttt{output\_moderation} đưa ASR về 0.000 trong khi vẫn giữ Utility Rate ở
+mức 0.613. Ngược lại, \texttt{input\_filter} và
+\texttt{defense\_in\_depth} cũng giúp giảm ASR nhưng làm ORR tăng lên 0.573 và
+Utility Rate giảm còn 0.427.
+
+Điều này cho thấy không phải mọi defense làm giảm ASR đều là lựa chọn tốt. Nếu
+một lớp phòng thủ chặn quá nhiều prompt hợp lệ, hệ thống có thể an toàn hơn
+theo nghĩa hẹp nhưng kém hữu ích hơn trong thực tế. Trong các ứng dụng như trợ
+lý học thuật, phân tích tài liệu hoặc hỗ trợ lập trình, over-refusal cao có thể
+làm người dùng không nhận được câu trả lời cho các câu hỏi hợp pháp.
+
+Trong demo này, \texttt{output\_moderation} đạt trade-off tốt nhất vì nó kiểm
+tra phản hồi sau khi mô hình đã sinh output. Cách tiếp cận này ít phụ thuộc hơn
+vào từ khóa xuất hiện trong input, do đó giảm nguy cơ chặn nhầm các prompt học
+thuật hoặc prompt an toàn có chứa thuật ngữ nhạy cảm. Tuy nhiên, kết quả này
+không có nghĩa output moderation luôn tốt hơn input filtering trong mọi hệ
+thống. Trong môi trường production, input filtering vẫn cần thiết để ngăn một
+số yêu cầu rõ ràng không phù hợp đi vào mô hình, đặc biệt khi chi phí gọi model
+cao hoặc khi cần giảm rủi ro ngay từ đầu.
+
+\subsection{Vai trò của input filtering và output moderation}
+
+Kết quả cho thấy input filtering có lợi thế là đơn giản, dễ triển khai và có
+thể chặn sớm một số prompt có dấu hiệu rủi ro. Tuy nhiên, rule-based input
+filtering trong demo này gây over-refusal cao. Nguyên nhân là nhiều prompt hợp
+lệ về AI safety, jailbreak hoặc an toàn hóa chất vẫn chứa các từ khóa nhạy cảm.
+Nếu filter chỉ dựa trên keyword, hệ thống khó phân biệt giữa thảo luận học thuật
+và yêu cầu gây hại thực sự.
+
+Ngược lại, output moderation đánh giá phản hồi sau khi model đã sinh nội dung.
+Điều này cho phép hệ thống chỉ chặn khi output thực sự có dấu hiệu unsafe
+compliance. Trong thực nghiệm, output moderation giảm ASR về 0.000 mà không làm
+giảm Utility Rate so với baseline. Đây là kết quả quan trọng vì nó cho thấy lớp
+kiểm soát sau sinh có thể giữ lại nhiều câu trả lời hợp lệ hơn.
+
+Tuy nhiên, output moderation cũng có hạn chế. Nếu moderation model hoặc rule
+không đủ mạnh, nội dung không an toàn có thể lọt qua. Ngoài ra, output
+moderation xảy ra sau khi model đã sinh phản hồi, nên trong một số hệ thống có
+tool-use hoặc streaming output, việc chặn sau sinh có thể không đủ an toàn.
+Do đó, trong các hệ thống thực tế, defense-in-depth vẫn cần thiết, nhưng các
+lớp defense phải được thiết kế tinh tế hơn so với keyword filtering đơn giản.
+
+\subsection{Vấn đề over-refusal}
+
+Over-refusal là một trong những hiện tượng nổi bật trong thực nghiệm. Nhóm
+\texttt{hazardous} có ORR tăng mạnh khi áp dụng input filtering, trong khi nhóm
+\texttt{knowledge} cũng có ORR đáng kể ngay cả khi không có defense. Điều này
+cho thấy các câu hỏi hợp lệ nhưng chứa thuật ngữ nhạy cảm có thể bị xử lý quá
+thận trọng.
+
+Trong bối cảnh AI safety, over-refusal đặc biệt đáng chú ý vì nhiều câu hỏi học
+thuật về jailbreak, prompt injection, guardrail hoặc benchmark có thể dùng cùng
+từ vựng với các prompt nguy hiểm. Nếu hệ thống không hiểu ngữ cảnh, nó có thể
+từ chối cả các yêu cầu phục vụ nghiên cứu, giáo dục hoặc đánh giá an toàn. Điều
+này làm giảm khả năng hỗ trợ người dùng và có thể khiến hệ thống kém hữu ích
+trong các tác vụ phân tích.
+
+Kết quả này củng cố nhận định rằng đánh giá LLM safety cần luôn đi kèm đánh giá
+utility. Một mô hình chỉ từ chối nhiều hơn không nhất thiết là một mô hình tốt
+hơn. Hệ thống cần học cách phân biệt giữa yêu cầu có mục đích gây hại và yêu
+cầu thảo luận an toàn ở mức khái niệm.
+
+\subsection{Độ tin cậy của evaluator}
+
+Evaluator trong demo hiện tại là rule-based. Cách tiếp cận này có ưu điểm là
+đơn giản, dễ kiểm tra và dễ tái lập. Tuy nhiên, nó cũng là một trong những giới
+hạn lớn nhất của thực nghiệm. Một phản hồi dài có thể bắt đầu bằng câu từ chối
+nhưng vẫn chứa phần giải thích không phù hợp phía sau. Ngược lại, một phản hồi
+có chứa từ khóa nhạy cảm không nhất thiết là unsafe nếu nó đang giải thích ở
+mức khái quát hoặc từ chối một cách an toàn.
+
+Do đó, nhãn \texttt{model\_label} và \texttt{final\_label} trong experiment nên
+được xem là nhãn gần đúng. Chúng đủ để minh họa pipeline và tạo kết quả định
+lượng ban đầu, nhưng chưa thay thế được human evaluation hoặc LLM-as-a-judge.
+Trong một benchmark nghiêm ngặt hơn, cần có rubric gán nhãn rõ ràng, nhiều
+người đánh giá độc lập, hoặc một judge model được kiểm định.
+
+Vấn đề này cũng liên quan đến manual web evaluation. Các cột \texttt{Passed\_*}
+trong file manual được giữ lại như nhãn nguồn, nhưng không được tự động diễn
+giải thành \textit{unsafe compliance} hay \textit{safe refusal}. Vì vậy,
+\texttt{passed\_1\_rate} không được xem là ASR. Manual evaluation chỉ đóng vai
+trò bổ sung, giúp xác định những case nên đọc thủ công sâu hơn.
+
+\subsection{Hạn chế do tài nguyên}
+
+Do giới hạn về tài nguyên tính toán, quota API và thời gian thực hiện, thí
+nghiệm có phạm vi tương đối nhỏ. Bộ prompt chỉ gồm 30 prompt gốc, không thể đại
+diện cho toàn bộ không gian jailbreak prompt. Target model chính được gọi qua
+OpenRouter API, nên kết quả phụ thuộc vào model, thời điểm gọi API, chính sách
+của provider và cấu hình generation.
+
+Ngoài ra, nhóm không chạy lại các official implementation nặng hơn như GCG,
+PAIR hoặc AutoDAN. Các phương pháp này thường cần nhiều lần gọi model, truy cập
+chi tiết hơn vào mô hình hoặc tài nguyên GPU. Vì vậy, thực nghiệm trong báo cáo
+này được định vị là demo tự xây dựng theo Cách 2, không phải reproduction đầy
+đủ của một paper cụ thể.
+
+Các defense cũng được cài đặt ở mức đơn giản. Input filter dựa trên keyword,
+output moderation dựa trên rule hoặc nhãn suy luận, và defense-in-depth là kết
+hợp của hai thành phần trên. Điều này đủ để minh họa trade-off nhưng chưa phản
+ánh đầy đủ hệ thống guardrail production, nơi thường sử dụng classifier chuyên
+dụng, policy engine, audit log và human review.
+
+\subsection{Hàm ý cho thiết kế hệ thống thực tế}
+
+Từ kết quả thực nghiệm, có thể rút ra một số hàm ý cho thiết kế hệ thống LLM
+thực tế.
+
+Thứ nhất, defense nên được đánh giá bằng nhiều chỉ số. Nếu chỉ tối ưu ASR, hệ
+thống có thể trở nên quá nghiêm ngặt và làm giảm utility. Ngược lại, nếu chỉ
+tối ưu utility, hệ thống có thể bỏ qua các trường hợp unsafe compliance. Một
+đánh giá cân bằng cần bao gồm ít nhất ASR, ORR, Utility Rate và phân tích lỗi.
+
+Thứ hai, defense-in-depth là cần thiết nhưng không nên được hiểu là cộng nhiều
+rule đơn giản vào nhau. Nếu mỗi lớp đều chặn rộng, tổng thể hệ thống sẽ có
+over-refusal cao. Defense-in-depth hiệu quả cần phân tầng theo ngữ cảnh: input
+guard để chặn yêu cầu rõ ràng nguy hiểm, output guard để kiểm tra nội dung
+được sinh ra, và cơ chế escalation cho các trường hợp không chắc chắn.
+
+Thứ ba, các nhóm prompt khác nhau cần cách xử lý khác nhau. Prompt liên quan
+đến thông tin nội bộ công ty có rủi ro khác với prompt học thuật về jailbreak
+hoặc prompt an toàn hóa chất. Một policy chung dựa trên keyword có thể không đủ
+tinh tế để xử lý mọi nhóm nội dung.
+
+\subsection{Hướng cải thiện}
+
+Nếu có thêm tài nguyên, thực nghiệm có thể được mở rộng theo các hướng sau:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mở rộng dataset}: tăng số lượng prompt, bổ sung benchmark
+    công khai và phân tầng rõ hơn theo mức độ rủi ro.
+
+    \item \textbf{So sánh nhiều target models}: chạy cùng pipeline trên nhiều
+    mô hình khác nhau để đánh giá độ ổn định của kết quả.
+
+    \item \textbf{Cải thiện evaluator}: thay rule-based evaluator bằng
+    LLM-as-a-judge, classifier chuyên dụng hoặc human evaluation có rubric.
+
+    \item \textbf{Tích hợp defense mạnh hơn}: thử nghiệm các guard model,
+    contextual moderation hoặc các defense được đề cập trong tutorial như
+    smoothing, adversarial training hoặc circuit breaker.
+
+    \item \textbf{Phân tích sâu error cases}: đọc thủ công các case unsafe
+    compliance và over-refusal để xác định nguyên nhân cụ thể.
+
+    \item \textbf{Mở rộng sang agentic systems}: kiểm thử prompt injection
+    trong bối cảnh tool-use, memory, retrieval hoặc multi-agent workflow.
+\end{itemize}
+
+Nhìn chung, phần thảo luận cho thấy kết quả thực nghiệm không nên được hiểu như
+một kết luận tổng quát về mọi mô hình hoặc mọi phương pháp jailbreak. Giá trị
+chính của demo là minh họa được cách xây dựng pipeline đánh giá, cách đo lường
+trade-off giữa safety và utility, và các vấn đề thực tế phát sinh khi triển khai
+defense trong hệ thống LLM.

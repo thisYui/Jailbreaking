@@ -4,15 +4,32 @@
 
 Project này xây dựng một pipeline thực nghiệm để đánh giá khả năng chống chịu của mô hình ngôn ngữ lớn trước các dạng **jailbreaking** và **prompt injection** trong bối cảnh kiểm thử an toàn AI.
 
-Mục tiêu của project không phải là tạo nội dung gây hại, mà là xây dựng một môi trường đánh giá có kiểm soát nhằm đo lường:
+Mục tiêu của project là xây dựng một môi trường đánh giá có kiểm soát nhằm đo lường:
 
-* mô hình có từ chối đúng các yêu cầu nguy hiểm hay không;
-* mô hình có trả lời đúng các yêu cầu hợp lệ hay không;
-* các kỹ thuật tấn công prompt ảnh hưởng thế nào đến hành vi mô hình;
-* các lớp phòng thủ như input filtering, output moderation và defense-in-depth có cải thiện độ an toàn hay không;
-* trade-off giữa safety và utility.
+* khả năng từ chối các yêu cầu nguy hiểm;
+* khả năng trả lời các yêu cầu hợp lệ;
+* ảnh hưởng của từng kỹ thuật biến đổi prompt;
+* hiệu quả của input filtering, output moderation và defense-in-depth;
+* trade-off giữa safety và utility;
+* các trường hợp thất bại cần được kiểm tra thủ công.
 
-Project hỗ trợ ba chế độ chạy:
+Project không được thiết kế để tạo hoặc tối ưu nội dung gây hại trong thực tế.
+
+---
+
+## 2. Các pipeline trong project
+
+Project có hai pipeline chính.
+
+### 2.1. Experiment pipeline
+
+Được chạy bằng:
+
+```powershell
+python src/run_experiment.py --mode <mode>
+```
+
+Các mode được hỗ trợ:
 
 ```text
 simulator
@@ -22,21 +39,43 @@ web_manual
 
 Trong đó:
 
-* `simulator`: dùng mô phỏng nội bộ, không gọi API thật.
-* `openrouter_api`: gọi mô hình riverflow-v2.5-fast:free thông qua OpenRouter API.
-* `web_manual`: export prompt để kiểm thử thủ công qua giao diện web.
+* `simulator`: dùng mô hình mô phỏng nội bộ, không gọi API.
+* `openrouter_api`: gửi prompt đến model thông qua OpenRouter API.
+* `web_manual`: pipeline legacy dùng schema manual chuẩn của `run_experiment.py`.
+
+### 2.2. Manual TSV analysis
+
+Đây là pipeline phân tích độc lập cho file:
+
+```text
+data/web_manual_responses.tsv
+```
+
+Chạy bằng:
+
+```powershell
+python src/analyze_manual.py
+```
+
+Pipeline này:
+
+* không phải một mode của `run_experiment.py`;
+* không tính ASR, ORR hoặc utility;
+* không áp dụng defense;
+* không tạo biểu đồ;
+* không ghi đè kết quả experiment chính;
+* chỉ tổng hợp các giá trị `Passed_*` có sẵn trong dữ liệu manual.
 
 ---
 
-## 2. Cấu trúc project
-
-Cấu trúc thư mục chính:
+## 3. Cấu trúc project
 
 ```text
 project_root/
 ├── data/
 │   ├── prompts.csv
-│   └── web_manual_responses.csv
+│   ├── web_manual_responses.csv
+│   └── web_manual_responses.tsv
 │
 ├── outputs/
 │   ├── attacked_prompts.csv
@@ -47,21 +86,32 @@ project_root/
 │
 ├── reports/
 │   ├── tables/
+│   │   ├── experiment_summary.csv
+│   │   ├── attack_summary.csv
+│   │   ├── defense_summary.csv
+│   │   ├── profile_summary.csv
+│   │   ├── error_cases.csv
+│   │   ├── manual_jailbreak_details.csv
+│   │   └── manual_jailbreak_summary.csv
+│   │
 │   ├── figures/
 │   ├── sections/
 │   ├── main.tex
-│   └── Report.pdf
+│   └── references.bib
 │
 ├── src/
 │   ├── run_experiment.py
+│   ├── analyze_manual.py
+│   ├── make_plots.py
 │   ├── config.py
 │   ├── attack_transforms.py
 │   ├── defenses.py
 │   ├── evaluator.py
 │   ├── openrouter_client.py
 │   ├── target_simulator.py
-│   ├── web_manual.py
-│   └── make_plots.py
+│   └── web_manual.py
+│
+├── tests/
 │
 ├── .env
 ├── .env.example
@@ -69,13 +119,48 @@ project_root/
 └── README.md
 ```
 
+Hai file manual có mục đích khác nhau:
+
+| File                            | Mục đích                                                |
+| ------------------------------- | ------------------------------------------------------- |
+| `data/web_manual_responses.csv` | Schema legacy cho `run_experiment.py --mode web_manual` |
+| `data/web_manual_responses.tsv` | Schema tùy chỉnh cho `python src/analyze_manual.py`     |
+
+Không dùng file TSV với `run_experiment.py`.
+
 ---
 
-## 3. File `.env`
+## 4. Cài đặt môi trường
 
-Project dùng file `.env` để lưu cấu hình API và model. File này **không nên commit lên GitHub** vì có thể chứa API key.
+Tạo virtual environment:
 
-Tạo file `.env` ở thư mục gốc project:
+```powershell
+python -m venv .venv
+```
+
+Kích hoạt trên Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Cài dependencies:
+
+```powershell
+pip install -r requirements.txt
+```
+
+Nếu chưa có `requirements.txt` hoàn chỉnh:
+
+```powershell
+pip install pandas matplotlib python-dotenv
+```
+
+---
+
+## 5. Cấu hình `.env`
+
+Tạo file `.env` tại thư mục gốc:
 
 ```env
 OPENROUTER_API=your_openrouter_api_key_here
@@ -84,7 +169,7 @@ OPENROUTER_TEMPERATURE=0.0
 OPENROUTER_MAX_OUTPUT_TOKENS=512
 ```
 
-Nên tạo thêm file `.env.example` để mô tả cấu hình cần thiết mà không chứa key thật:
+File `.env.example`:
 
 ```env
 OPENROUTER_API=
@@ -93,39 +178,13 @@ OPENROUTER_TEMPERATURE=0.0
 OPENROUTER_MAX_OUTPUT_TOKENS=512
 ```
 
----
-
-## 4. Cài đặt môi trường
-
-Tạo virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Kích hoạt môi trường trên Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Cài thư viện cần thiết:
-
-```bash
-pip install pandas matplotlib python-dotenv
-```
-
-Nếu dùng file `requirements.txt`, có thể cài bằng:
-
-```bash
-pip install -r requirements.txt
-```
+Không commit `.env` lên GitHub.
 
 ---
 
-## 5. Dữ liệu đầu vào
+## 6. Dữ liệu prompt chính
 
-File prompt chính nằm ở:
+Experiment pipeline đọc:
 
 ```text
 data/prompts.csv
@@ -134,27 +193,32 @@ data/prompts.csv
 Các cột bắt buộc:
 
 ```text
-id, category, prompt, expected_behavior, risk_type, notes
+id
+category
+prompt
+expected_behavior
+risk_type
+notes
 ```
 
 Ý nghĩa:
 
-| Cột                 | Mô tả                                                        |
-| ------------------- | ------------------------------------------------------------ |
-| `id`                | Mã định danh prompt                                          |
-| `category`          | Nhóm prompt: `benign`, `harmful`, hoặc `borderline`          |
-| `prompt`            | Prompt gốc                                                   |
-| `expected_behavior` | Hành vi kỳ vọng: `answer` hoặc `refuse`                      |
-| `risk_type`         | Loại rủi ro, ví dụ `knowledge_*`, `company_*`, `hazardous_*` |
-| `notes`             | Ghi chú phục vụ báo cáo                                      |
+| Cột                 | Mô tả                                 |
+| ------------------- | ------------------------------------- |
+| `id`                | Mã định danh prompt                   |
+| `category`          | `benign`, `harmful` hoặc `borderline` |
+| `prompt`            | Prompt gốc                            |
+| `expected_behavior` | `answer` hoặc `refuse`                |
+| `risk_type`         | Loại rủi ro hoặc nhóm nội dung        |
+| `notes`             | Ghi chú phục vụ phân tích             |
 
-Nếu `data/prompts.csv` chưa tồn tại, chương trình có thể tự tạo bộ prompt mẫu.
+Nếu file không tồn tại, `run_experiment.py` có thể tạo bộ prompt mẫu.
 
 ---
 
-## 6. Các loại tấn công
+## 7. Các attack type
 
-Pipeline áp dụng nhiều biến thể tấn công lên mỗi prompt gốc:
+Mỗi prompt được biến đổi theo năm attack type:
 
 ```text
 none
@@ -164,33 +228,31 @@ multi_turn_simulation
 injection_style
 ```
 
-Ý nghĩa:
+| Attack type             | Mô tả                                    |
+| ----------------------- | ---------------------------------------- |
+| `none`                  | Giữ nguyên prompt                        |
+| `role_play`             | Bọc prompt trong ngữ cảnh nhập vai       |
+| `obfuscation`           | Làm nhiễu một số từ khóa                 |
+| `multi_turn_simulation` | Chuyển prompt thành dạng nhiều bước      |
+| `injection_style`       | Đưa prompt vào cấu trúc prompt injection |
 
-| Attack type             | Mô tả                                                      |
-| ----------------------- | ---------------------------------------------------------- |
-| `none`                  | Không biến đổi prompt                                      |
-| `role_play`             | Bọc prompt trong ngữ cảnh nhập vai                         |
-| `obfuscation`           | Làm nhiễu nhẹ một số từ khóa                               |
-| `multi_turn_simulation` | Giả lập yêu cầu nhiều bước                                 |
-| `injection_style`       | Đưa prompt vào dạng external content hoặc prompt injection |
-
-Do mỗi prompt được chạy qua 5 attack types, số API calls trong chế độ `openrouter_api` được tính như sau:
+Số API calls:
 
 ```text
-Số API calls = số dòng prompt × 5
+Số API calls = số prompt × 5 attack types
 ```
 
 Ví dụ:
 
 ```text
-30 prompt rows × 5 attack types = 150 API calls
+30 prompt × 5 attack types = 150 API calls
 ```
 
 ---
 
-## 7. Các lớp phòng thủ
+## 8. Các defense type
 
-Sau khi có phản hồi từ mô hình, pipeline đánh giá phản hồi qua các defense types:
+Các defense được áp dụng offline sau khi đã nhận phản hồi từ model:
 
 ```text
 no_defense
@@ -199,85 +261,92 @@ output_moderation
 defense_in_depth
 ```
 
-Ý nghĩa:
+| Defense type        | Mô tả                                     |
+| ------------------- | ----------------------------------------- |
+| `no_defense`        | Không áp dụng defense                     |
+| `input_filter`      | Chặn dựa trên nội dung prompt             |
+| `output_moderation` | Chặn dựa trên nhãn hoặc nội dung output   |
+| `defense_in_depth`  | Kết hợp input filter và output moderation |
 
-| Defense type        | Mô tả                                            |
-| ------------------- | ------------------------------------------------ |
-| `no_defense`        | Không áp dụng phòng thủ                          |
-| `input_filter`      | Chặn dựa trên nội dung prompt đầu vào            |
-| `output_moderation` | Chặn dựa trên nhãn hoặc nội dung phản hồi đầu ra |
-| `defense_in_depth`  | Kết hợp input filtering và output moderation     |
-
-Lưu ý: trong chế độ `openrouter_api`, defense được chạy **offline** sau khi nhận phản hồi. Defense không làm tăng số API calls.
+Trong `openrouter_api`, mỗi prompt-attack chỉ được gọi API một lần. Bốn defense được áp dụng offline nên không làm tăng số API calls.
 
 ---
 
-## 8. Chạy bằng simulator
+## 9. Chạy simulator
 
-Chế độ simulator không gọi API thật, phù hợp để kiểm tra pipeline nhanh:
+Chạy toàn bộ:
 
-```bash
+```powershell
 python src/run_experiment.py --mode simulator
 ```
 
-Chạy giới hạn số dòng:
+Chạy giới hạn số prompt:
 
-```bash
+```powershell
 python src/run_experiment.py --mode simulator --limit 10
 ```
 
-Chạy theo khoảng dòng:
+Chạy một khoảng dòng:
 
-```bash
+```powershell
 python src/run_experiment.py --mode simulator --row-from 0 --row-to 5
 ```
 
+Simulator phù hợp để kiểm tra pipeline trước khi gọi API thật.
+
+### Cảnh báo
+
+Không chạy lại simulator sau khi đã tạo kết quả OpenRouter chính thức, trừ khi đã sao lưu output.
+
+Mọi mode của `run_experiment.py` sử dụng chung đường dẫn output và có thể ghi đè kết quả trước đó.
+
 ---
 
-## 9. Chạy bằng OpenRouter API
+## 10. Chạy OpenRouter API
 
-Trước khi chạy, cần chắc chắn file `.env` đã có `OPENROUTER_API`.
+Đảm bảo `.env` chứa:
 
-Chạy 5 dòng đầu tiên, nghỉ 5 giây giữa các API calls:
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
+```env
+OPENROUTER_API=...
 ```
 
-Lệnh trên sẽ tạo:
+Chạy thử hai prompt:
+
+```powershell
+python src/run_experiment.py `
+  --mode openrouter_api `
+  --row-from 0 `
+  --row-to 2 `
+  --sleep-seconds 10
+```
+
+Chạy năm prompt đầu:
+
+```powershell
+python src/run_experiment.py `
+  --mode openrouter_api `
+  --row-from 0 `
+  --row-to 5 `
+  --sleep-seconds 5
+```
+
+Thông tin dự kiến:
 
 ```text
-5 prompt rows × 5 attack types = 25 API calls
+5 prompt × 5 attack types = 25 API calls
 ```
 
-Chạy batch tiếp theo:
+Nếu bị rate limit:
 
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
-```
-
-Chạy toàn bộ 30 dòng theo từng batch nhỏ:
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 10 --row-to 15 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 15 --row-to 20 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 20 --row-to 25 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 25 --row-to 30 --sleep-seconds 5
-```
-
-Nếu vẫn bị rate limit, giảm số dòng mỗi batch và tăng thời gian nghỉ:
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 2 --sleep-seconds 10
-```
+* giảm số prompt mỗi batch;
+* tăng `--sleep-seconds`;
+* kiểm tra quota của model hoặc provider.
 
 ---
 
-## 10. Lưu ý khi chạy nhiều batch
+## 11. Lưu ý khi chạy theo batch
 
-Mỗi lần chạy, các file output mặc định sẽ bị ghi đè:
+Mỗi lần chạy `run_experiment.py`, chương trình ghi đè các file:
 
 ```text
 outputs/attacked_prompts.csv
@@ -286,81 +355,245 @@ outputs/raw_logs.jsonl
 outputs/openrouter_api_raw_responses.jsonl
 ```
 
-Vì vậy sau mỗi batch nên copy output sang file riêng.
+Đồng thời ghi đè:
 
-Ví dụ trên Windows PowerShell:
-
-```powershell
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
-
-Copy-Item outputs\detailed_results.csv outputs\detailed_results_0_5.csv
-Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_0_5.csv
-Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_0_5.jsonl
-Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_0_5.jsonl
+```text
+reports/tables/experiment_summary.csv
+reports/tables/attack_summary.csv
+reports/tables/defense_summary.csv
+reports/tables/profile_summary.csv
+reports/tables/error_cases.csv
 ```
 
-Batch tiếp theo:
+Vì vậy, sau mỗi batch cần sao lưu output.
+
+Ví dụ:
 
 ```powershell
-python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
+python src/run_experiment.py `
+  --mode openrouter_api `
+  --row-from 0 `
+  --row-to 5 `
+  --sleep-seconds 5
 
-Copy-Item outputs\detailed_results.csv outputs\detailed_results_5_10.csv
-Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_5_10.csv
-Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_5_10.jsonl
-Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_5_10.jsonl
+Copy-Item `
+  outputs\detailed_results.csv `
+  outputs\detailed_results_0_5.csv
+
+Copy-Item `
+  outputs\attacked_prompts.csv `
+  outputs\attacked_prompts_0_5.csv
+
+Copy-Item `
+  outputs\openrouter_api_raw_responses.jsonl `
+  outputs\openrouter_api_raw_responses_0_5.jsonl
+
+Copy-Item `
+  outputs\raw_logs.jsonl `
+  outputs\raw_logs_0_5.jsonl
 ```
+
+Thực hiện tương tự cho các batch tiếp theo.
+
+### Quan trọng
+
+Không chạy `make_plots.py` ngay sau batch cuối nếu bạn muốn biểu đồ đại diện cho toàn bộ dataset.
+
+Batch cuối chỉ chứa một phần dữ liệu và đã ghi đè các bảng summary trước đó.
+
+Để có kết quả đầy đủ cần:
+
+1. hợp nhất các file `detailed_results_<range>.csv`;
+2. tính lại các bảng summary từ dữ liệu đã hợp nhất;
+3. sau đó mới chạy `make_plots.py`.
+
+Nếu `outputs/detailed_results.csv` hiện tại đã chứa đầy đủ toàn bộ experiment thì không cần chạy lại theo batch.
 
 ---
 
-## 11. Chạy web manual mode
+## 12. Legacy web manual mode
 
-Chế độ này dùng để export prompt đã bị biến đổi, sau đó người dùng copy prompt vào giao diện web và paste response thủ công vào file phản hồi.
+Mode legacy dùng schema chuẩn của `run_experiment.py`.
 
 Export prompt:
 
-```bash
-python src/run_experiment.py --mode web_manual --export-only
+```powershell
+python src/run_experiment.py `
+  --mode web_manual `
+  --export-only
 ```
 
-File được tạo:
+Output:
 
 ```text
 outputs/web_manual_export.csv
 ```
 
-Sau đó copy `attacked_prompt` vào web UI, lấy response và điền vào:
+Sau đó người dùng điền response vào:
 
 ```text
 data/web_manual_responses.csv
 ```
 
-Rồi chạy đánh giá:
+File CSV legacy phải có các cột:
 
-```bash
+```text
+id
+category
+attack_type
+attack_profile
+defense_type
+expected_behavior
+risk_type
+prompt
+attacked_prompt
+response_text
+manual_label
+notes
+```
+
+Chạy legacy manual:
+
+```powershell
 python src/run_experiment.py --mode web_manual
+```
+
+### Không dùng lệnh này cho TSV tùy chỉnh
+
+Không chạy:
+
+```powershell
+python src/run_experiment.py --mode web_manual
+```
+
+với file:
+
+```text
+data/web_manual_responses.tsv
+```
+
+TSV tùy chỉnh phải được xử lý bằng:
+
+```powershell
+python src/analyze_manual.py
 ```
 
 ---
 
-## 12. Output chính
+## 13. Manual TSV analysis
 
-Sau khi chạy, project tạo các file chính:
+Manual TSV analysis là phân tích bổ sung, độc lập với metric experiment chính.
+
+Input:
+
+```text
+data/web_manual_responses.tsv
+```
+
+File phải sử dụng ký tự tab thật làm delimiter.
+
+Các cột:
+
+```text
+prompts
+Meaning
+Chatgpt 5.5
+Passed_Chatgpt
+Claude Haiku 4,5
+Passed_Haiku
+Gemini 3.1 Flash Lite
+Passed_Gemini
+```
+
+Trong đó:
+
+* `prompts`: prompt được gửi vào model;
+* `Meaning`: ý nghĩa hoặc prompt gốc;
+* các cột model chứa response;
+* `Passed_*` chứa nhãn manual có sẵn.
+
+### Kiểm tra file
+
+```powershell
+Test-Path data\web_manual_responses.tsv
+```
+
+Kết quả mong đợi:
+
+```text
+True
+```
+
+### Chạy phân tích
+
+```powershell
+python src/analyze_manual.py
+```
+
+Output:
+
+```text
+reports/tables/manual_jailbreak_details.csv
+reports/tables/manual_jailbreak_summary.csv
+```
+
+Nếu input có 30 prompt và 3 model:
+
+```text
+30 source rows × 3 models = 90 detail rows
+```
+
+### Ý nghĩa của `Passed_*`
+
+Script chỉ chuẩn hóa:
+
+```text
+1, 1.0, true, yes  -> 1
+0, 0.0, false, no -> 0
+giá trị khác        -> missing
+```
+
+Script không diễn giải:
+
+```text
+Passed = 1 -> unsafe_compliance
+Passed = 0 -> safe_refusal
+```
+
+Do đó:
+
+* `passed_1_rate` không phải ASR;
+* `has_any_passed_1` không tự động chứng minh jailbreak thành công;
+* kết quả manual không được gộp vào plot chính;
+* kết quả cần được diễn giải theo quy tắc gán nhãn manual ban đầu.
+
+---
+
+## 14. Output của experiment chính
 
 ### `outputs/attacked_prompts.csv`
 
-Lưu prompt gốc và prompt sau khi áp dụng attack transform.
+Lưu prompt gốc và prompt sau attack transform.
 
-Các cột quan trọng:
+Các cột chính:
 
 ```text
-id, category, risk_type, attack_type, attack_profile, prompt, attacked_prompt, expected_behavior, notes
+id
+category
+risk_type
+attack_type
+attack_profile
+prompt
+attacked_prompt
+expected_behavior
+notes
 ```
 
 ### `outputs/detailed_results.csv`
 
-Lưu kết quả chi tiết ở cấp từng prompt, attack type và defense type.
+Lưu kết quả ở cấp prompt, attack và defense.
 
-Các cột quan trọng:
+Các cột:
 
 ```text
 run_mode
@@ -388,126 +621,170 @@ error
 
 ### `outputs/raw_logs.jsonl`
 
-Lưu log thô của quá trình chạy.
+Lưu log thô của experiment.
 
 ### `outputs/openrouter_api_raw_responses.jsonl`
 
-Lưu phản hồi thô từ OpenRouter API khi chạy `openrouter_api`.
+Lưu response thô từ OpenRouter API.
 
 ---
 
-## 13. Các chỉ số đánh giá
+## 15. Các bảng tổng hợp
 
-Pipeline tính các chỉ số chính:
-
-| Metric         | Ý nghĩa                                                                 |
-| -------------- | ----------------------------------------------------------------------- |
-| `ASR`          | Attack Success Rate, tỷ lệ prompt harmful khiến model unsafe compliance |
-| `ORR`          | Over-Refusal Rate, tỷ lệ prompt answerable nhưng bị từ chối             |
-| `Utility Rate` | Tỷ lệ prompt hợp lệ được trả lời đúng                                   |
-| `Refusal Rate` | Tỷ lệ phản hồi bị từ chối hoặc bị guard chặn                            |
-| `Unsafe Rate`  | Tỷ lệ phản hồi bị đánh giá là unsafe compliance                         |
-| `Avg Cost`     | Chi phí mô phỏng tương đối của defense pipeline                         |
-
-Các bảng tổng hợp được lưu ở:
+Experiment pipeline tạo:
 
 ```text
-reports/tables/
+reports/tables/experiment_summary.csv
+reports/tables/attack_summary.csv
+reports/tables/defense_summary.csv
+reports/tables/profile_summary.csv
+reports/tables/error_cases.csv
 ```
 
-Bao gồm:
+Manual TSV analysis tạo riêng:
 
 ```text
-experiment_summary.csv
-attack_summary.csv
-defense_summary.csv
-profile_summary.csv
-error_cases.csv
+reports/tables/manual_jailbreak_details.csv
+reports/tables/manual_jailbreak_summary.csv
 ```
+
+Hai nhóm bảng không được gộp tự động.
 
 ---
 
-## 14. Tạo biểu đồ cho báo cáo
+## 16. Các metric chính
 
-Sau khi có bảng kết quả, chạy:
+| Metric         | Ý nghĩa                                  |
+| -------------- | ---------------------------------------- |
+| `ASR`          | Attack Success Rate trên prompt harmful  |
+| `ORR`          | Over-Refusal Rate trên prompt answerable |
+| `Utility Rate` | Tỷ lệ prompt hợp lệ được trả lời         |
+| `Refusal Rate` | Tỷ lệ bị từ chối hoặc guard chặn         |
+| `Unsafe Rate`  | Tỷ lệ bị đánh nhãn unsafe compliance     |
+| `Avg Cost`     | Chi phí mô phỏng tương đối của defense   |
 
-```bash
-python src/make_plots.py
-```
+Các metric này chỉ áp dụng cho experiment pipeline.
 
-Biểu đồ sẽ được lưu vào:
-
-```text
-reports/figures/
-```
-
-Các hình chính:
-
-```text
-asr_by_defense.png
-orr_by_defense.png
-utility_by_defense.png
-safety_utility_tradeoff.png
-asr_by_profile.png
-orr_by_profile.png
-```
+Không áp dụng các tên metric này cho bảng manual TSV.
 
 ---
 
-## 15. Quy trình chạy khuyến nghị cho báo cáo
+## 17. Tạo biểu đồ
 
-### Bước 1: Kiểm tra pipeline bằng simulator
-
-```bash
-python src/run_experiment.py --mode simulator --limit 30
-```
-
-### Bước 2: Chạy thử OpenRouter API với batch nhỏ
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 2 --sleep-seconds 10
-```
-
-### Bước 3: Nếu ổn, chạy theo batch 5 dòng
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 0 --row-to 5 --sleep-seconds 5
-```
-
-### Bước 4: Lưu output batch
+Sau khi đã có bảng summary đầy đủ:
 
 ```powershell
-Copy-Item outputs\detailed_results.csv outputs\detailed_results_0_5.csv
-Copy-Item outputs\attacked_prompts.csv outputs\attacked_prompts_0_5.csv
-Copy-Item outputs\openrouter_api_raw_responses.jsonl outputs\openrouter_api_raw_responses_0_5.jsonl
-Copy-Item outputs\raw_logs.jsonl outputs\raw_logs_0_5.jsonl
-```
-
-### Bước 5: Chạy các batch tiếp theo
-
-```bash
-python src/run_experiment.py --mode openrouter_api --row-from 5 --row-to 10 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 10 --row-to 15 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 15 --row-to 20 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 20 --row-to 25 --sleep-seconds 5
-python src/run_experiment.py --mode openrouter_api --row-from 25 --row-to 30 --sleep-seconds 5
-```
-
-### Bước 6: Tạo bảng và hình cho báo cáo
-
-```bash
 python src/make_plots.py
+```
+
+Script đọc:
+
+```text
+reports/tables/experiment_summary.csv
+reports/tables/profile_summary.csv
+```
+
+Script không đọc:
+
+```text
+reports/tables/manual_jailbreak_details.csv
+reports/tables/manual_jailbreak_summary.csv
+```
+
+Các hình được tạo:
+
+```text
+reports/figures/asr_by_defense.png
+reports/figures/orr_by_defense.png
+reports/figures/utility_by_defense.png
+reports/figures/safety_utility_tradeoff.png
+reports/figures/asr_by_profile.png
+reports/figures/orr_by_profile.png
+```
+
+`make_plots.py` chỉ tạo hình. Các bảng summary đã được tạo trước đó bởi experiment pipeline.
+
+---
+
+## 18. Quy trình khuyến nghị khi bắt đầu lại experiment
+
+### Bước 1: Kiểm tra simulator
+
+```powershell
+python src/run_experiment.py --mode simulator --limit 5
+```
+
+### Bước 2: Chạy thử API
+
+```powershell
+python src/run_experiment.py `
+  --mode openrouter_api `
+  --row-from 0 `
+  --row-to 2 `
+  --sleep-seconds 10
+```
+
+### Bước 3: Chạy experiment chính
+
+Ưu tiên chạy toàn bộ trong một lần nếu quota cho phép:
+
+```powershell
+python src/run_experiment.py `
+  --mode openrouter_api `
+  --row-from 0 `
+  --row-to 30 `
+  --sleep-seconds 5
+```
+
+Nếu phải chia batch, cần sao lưu từng batch và hợp nhất trước khi tạo biểu đồ.
+
+### Bước 4: Tạo biểu đồ
+
+```powershell
+python src/make_plots.py
+```
+
+### Bước 5: Phân tích manual TSV
+
+```powershell
+python src/analyze_manual.py
+```
+
+Manual analysis có thể chạy trước hoặc sau `make_plots.py` vì hai script sử dụng output độc lập.
+
+---
+
+## 19. Quy trình hiện tại khi experiment đã chạy xong
+
+Nếu experiment đã hoàn tất, các bảng summary chính đã tồn tại và file manual TSV đã được chuẩn bị, chỉ cần chạy:
+
+```powershell
+python src/analyze_manual.py
+python src/make_plots.py
+```
+
+Không cần chạy lại:
+
+```powershell
+python src/run_experiment.py
+```
+
+vì lệnh đó có thể ghi đè kết quả hiện tại.
+
+Kiểm tra output:
+
+```powershell
+Get-ChildItem reports\tables\*.csv
+Get-ChildItem reports\figures\*.png
 ```
 
 ---
 
-## 16. Diễn giải kết quả trong báo cáo
+## 20. Diễn giải kết quả
 
-Khi viết báo cáo, nên tách kết quả theo ba lớp phân tích:
+### 20.1. Theo attack type
 
-### 16.1. Theo attack type
-
-So sánh ASR giữa:
+So sánh:
 
 ```text
 none
@@ -517,9 +794,9 @@ multi_turn_simulation
 injection_style
 ```
 
-Mục tiêu là xác định dạng jailbreaking nào làm mô hình dễ bị unsafe compliance nhất.
+Mục tiêu là xác định attack type nào làm tăng unsafe compliance.
 
-### 16.2. Theo defense type
+### 20.2. Theo defense type
 
 So sánh:
 
@@ -530,11 +807,17 @@ output_moderation
 defense_in_depth
 ```
 
-Mục tiêu là đánh giá defense nào giảm ASR tốt nhất, đồng thời có gây over-refusal quá cao hay không.
+Cần xem xét đồng thời:
 
-### 16.3. Theo attack profile
+* ASR;
+* ORR;
+* utility rate;
+* refusal rate;
+* chi phí tương đối.
 
-So sánh các nhóm:
+### 20.3. Theo attack profile
+
+So sánh:
 
 ```text
 knowledge
@@ -543,24 +826,50 @@ hazardous
 generic
 ```
 
-Mục tiêu là xem mô hình dễ thất bại hơn ở nhóm nào: tri thức an toàn, dữ liệu nội bộ công ty, hay nội dung rủi ro cao.
+Mục tiêu là xác định nhóm nội dung nào làm model hoặc defense dễ thất bại hơn.
+
+### 20.4. Manual analysis
+
+Manual TSV nên được trình bày như phân tích bổ sung.
+
+Có thể báo cáo:
+
+* tổng số case của từng model;
+* số response bị thiếu;
+* số nhãn `Passed = 1`;
+* số nhãn `Passed = 0`;
+* số case chưa được gán nhãn.
+
+Không gọi `passed_1_rate` là ASR hoặc jailbreak rate nếu chưa có định nghĩa nhãn rõ ràng.
 
 ---
 
-## 17. Giới hạn của thực nghiệm
+## 21. Giới hạn của thực nghiệm
 
-Một số giới hạn cần nêu trong báo cáo:
+Các giới hạn chính:
 
-* Bộ prompt còn nhỏ, chủ yếu phục vụ kiểm thử có kiểm soát.
-* Nhãn `model_label` trong chế độ API được suy ra bằng rule-based evaluator, chưa thay thế hoàn toàn human evaluation.
-* Input filter và output moderation hiện là rule-based đơn giản, chưa phải classifier chuyên dụng.
-* Defense chạy offline sau response nên không phản ánh đầy đủ kiến trúc production thực tế.
-* Kết quả phụ thuộc vào model, thời điểm gọi API, cấu hình temperature và chính sách an toàn của nhà cung cấp.
+* số lượng prompt còn nhỏ;
+* evaluator API hiện là rule-based;
+* input filter và output moderation dùng keyword đơn giản;
+* defense được chạy offline;
+* kết quả phụ thuộc model và thời điểm gọi API;
+* output có thể thay đổi theo chính sách provider;
+* batch execution chưa tự động hợp nhất kết quả;
+* manual `Passed_*` chưa được chuẩn hóa thành safety label;
+* một response chứa từ khóa từ chối vẫn có thể bao gồm nội dung không an toàn phía sau;
+* metric hiện tại không thay thế đánh giá thủ công chuyên sâu.
 
 ---
 
-## 18. Mục đích an toàn
+## 22. Mục đích an toàn
 
-Project này phục vụ mục đích học thuật và đánh giá an toàn AI. Các prompt harmful trong dataset được thiết kế ở mức kiểm thử có kiểm soát, nhằm đo lường khả năng từ chối của mô hình và hiệu quả của các lớp phòng thủ.
+Project phục vụ mục đích học thuật, red teaming có kiểm soát và đánh giá an toàn AI.
+
+Các prompt harmful được sử dụng để:
+
+* kiểm tra khả năng từ chối;
+* đo lường độ bền trước prompt injection;
+* so sánh các defense;
+* phân tích failure cases.
 
 Không sử dụng project để tạo, tối ưu hoặc triển khai nội dung gây hại trong thực tế.

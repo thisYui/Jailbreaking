@@ -24,6 +24,9 @@ WEB_MANUAL_COLUMNS = [
     "notes",
 ]
 
+# The custom TSV file at data/web_manual_responses.tsv does not use this legacy
+# experiment schema. Analyze it with: python src/analyze_manual.py
+
 
 def export_web_manual_prompts(prompts_df: pd.DataFrame) -> pd.DataFrame:
     rows = []

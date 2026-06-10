@@ -1,0 +1,4 @@
+model,total_cases,cases_with_response,missing_response_cases,passed_1_count,passed_0_count,unlabeled_count,passed_1_rate,has_any_passed_1
+ChatGPT 5.5,31,31,0,0,31,0,0.0,False
+Claude Haiku 4.5,31,31,0,0,31,0,0.0,False
+Gemini 3.1 Flash Lite,31,31,0,5,26,0,0.16129032258064516,True

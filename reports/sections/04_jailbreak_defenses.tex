@@ -1,0 +1,464 @@
+\section{Jailbreak Defenses}
+\label{sec:jailbreak-defenses}
+
+Chương trước đã trình bày các nhóm jailbreak attacks và cho thấy rằng
+attack có thể được xây dựng thủ công, tự động hóa, tối ưu bằng thuật toán
+hoặc thích nghi với cơ chế phòng thủ. Chương này phân tích các nhóm
+phòng thủ trước jailbreak ở cấp đầu vào, cấp mô hình, thời điểm suy luận,
+đầu ra và toàn bộ kiến trúc hệ thống.
+
+Mục tiêu của jailbreak defense không chỉ là giảm tỷ lệ mô hình tạo phản
+hồi không an toàn, mà còn phải duy trì khả năng hỗ trợ các yêu cầu hợp lệ.
+Do đó, một defense cần được đánh giá đồng thời theo safety, utility,
+over-refusal, chi phí suy luận và khả năng chống lại adaptive attacks.
+
+\subsection{Taxonomy các phương pháp phòng thủ}
+\label{subsec:defense-taxonomy}
+
+Có thể phân loại jailbreak defenses theo vị trí triển khai trong pipeline
+của hệ thống LLM. Bảng~\ref{tab:jailbreak-defense-taxonomy} tóm tắt các
+nhóm phòng thủ chính được phân tích trong chương này.
+
+\begin{table}[H]
+\centering
+\caption{Taxonomy các phương pháp phòng thủ trước jailbreak.}
+\label{tab:jailbreak-defense-taxonomy}
+\begin{tabularx}{\textwidth}{
+    >{\bfseries}p{0.24\textwidth}
+    p{0.30\textwidth}
+    X
+}
+\toprule
+Nhóm phòng thủ
+& Vị trí triển khai
+& Mục tiêu chính \\
+\midrule
+
+Input filtering
+& Trước khi prompt được đưa vào mô hình
+& Phát hiện hoặc chặn đầu vào có rủi ro, bao gồm prompt bất thường hoặc
+có dấu hiệu jailbreak. \\
+
+Prompt preprocessing
+& Trước hoặc trong quá trình xây dựng context
+& Chuẩn hóa, làm sạch hoặc tái diễn đạt đầu vào để giảm tác động của
+obfuscation và prompt injection. \\
+
+Adversarial training
+& Trong quá trình huấn luyện hoặc fine-tuning
+& Bổ sung dữ liệu tấn công vào huấn luyện để tăng độ bền của hành vi từ
+chối. \\
+
+Inference-time defenses
+& Trong quá trình suy luận
+& Kiểm tra tính ổn định của phản hồi, lấy mẫu nhiều lần hoặc dùng cơ chế
+phát hiện rủi ro tại runtime. \\
+
+Output moderation
+& Sau khi mô hình sinh phản hồi
+& Kiểm duyệt phản hồi trước khi gửi cho người dùng. \\
+
+Guard models
+& Xung quanh mô hình chính
+& Dùng một mô hình hoặc classifier riêng để đánh giá input, output hoặc
+trajectory. \\
+
+System-level defenses
+& Cấp ứng dụng và kiến trúc
+& Giới hạn quyền công cụ, sandbox, xác nhận người dùng và monitoring. \\
+
+Defense-in-depth
+& Toàn bộ pipeline
+& Kết hợp nhiều lớp phòng thủ để tránh phụ thuộc vào một cơ chế duy nhất. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cách phân loại này nhấn mạnh rằng defense không nhất thiết nằm bên trong
+LLM. Trong các hệ thống thực tế, độ an toàn thường phụ thuộc vào nhiều
+thành phần phối hợp: policy, guard model, system prompt, mô hình chính,
+bộ điều khiển công cụ, kiểm duyệt đầu ra và giám sát sau triển khai.
+
+\subsection{Input filtering}
+\label{subsec:input-filtering}
+
+Input filtering là lớp phòng thủ được đặt trước mô hình chính. Mục tiêu
+là phát hiện hoặc chặn các prompt có dấu hiệu rủi ro trước khi chúng được
+đưa vào LLM. Các bộ lọc đầu vào có thể dựa trên luật, từ khóa, classifier,
+embedding similarity hoặc một guard model chuyên đánh giá an toàn.
+
+Một input filter đơn giản có thể kiểm tra xem yêu cầu có thuộc nhóm chính
+sách không được phép hay không. Các hệ thống phức tạp hơn có thể đánh giá
+cả ý định ngữ nghĩa, mức độ bất thường của prompt, dấu hiệu obfuscation
+hoặc các chỉ dẫn cố gắng thay đổi vai trò của mô hình.
+
+Ưu điểm của input filtering là có thể ngăn một số attack ngay từ đầu, giảm
+tải cho mô hình chính và dễ tích hợp vào pipeline triển khai. Tuy nhiên,
+input filtering có ba hạn chế quan trọng. Thứ nhất, nếu bộ lọc dựa quá
+nhiều vào đặc trưng bề mặt, attacker có thể thay đổi cách diễn đạt để né
+lọc. Thứ hai, bộ lọc quá nghiêm ngặt có thể làm tăng over-refusal. Thứ ba,
+input filtering khó xử lý các trường hợp multi-turn hoặc indirect prompt
+injection, nơi rủi ro chỉ xuất hiện khi kết hợp nhiều phần ngữ cảnh.
+
+Do đó, input filtering nên được xem là một lớp phòng thủ ban đầu, không
+phải cơ chế bảo vệ duy nhất.
+
+\subsection{Prompt preprocessing}
+\label{subsec:prompt-preprocessing}
+
+Prompt preprocessing là nhóm kỹ thuật xử lý đầu vào trước khi đưa vào mô
+hình. Mục tiêu là giảm tác động của những biến đổi bề mặt như obfuscation,
+encoding hoặc cách trình bày gây nhiễu.
+
+Các thao tác preprocessing có thể bao gồm chuẩn hóa ký tự, loại bỏ nhiễu
+không cần thiết, tách rõ phần instruction và phần data, hoặc chuyển prompt
+về một định dạng có cấu trúc hơn. Với các hệ thống retrieval hoặc
+tool-integrated agents, preprocessing còn có thể đánh dấu nội dung bên
+ngoài là dữ liệu không đáng tin cậy, thay vì cho phép nó được hiểu như chỉ
+dẫn điều khiển hệ thống.
+
+Một nguyên tắc quan trọng là không trộn lẫn dữ liệu bên ngoài với chỉ dẫn
+cấp hệ thống. Ví dụ, nội dung từ website, tài liệu, email hoặc kết quả trả
+về từ công cụ nên được đặt trong vùng ngữ cảnh được đánh dấu rõ là
+external content. Cách này không loại bỏ hoàn toàn prompt injection, nhưng
+giúp mô hình và các guard dễ phân biệt hơn giữa instruction và data.
+
+Hạn chế của prompt preprocessing là nó không thể bảo đảm giữ nguyên toàn
+bộ ý nghĩa của prompt. Nếu preprocessing làm thay đổi nội dung quá mạnh,
+hệ thống có thể hiểu sai yêu cầu hợp lệ. Ngược lại, nếu preprocessing quá
+nhẹ, nó có thể không đủ để loại bỏ những biến đổi adversarial.
+
+\subsection{Adversarial training}
+\label{subsec:adversarial-training}
+
+Adversarial training là cách đưa các ví dụ tấn công vào quá trình huấn
+luyện hoặc fine-tuning để tăng độ bền của mô hình. Thay vì chỉ huấn luyện
+mô hình trên các yêu cầu thông thường, hệ thống được tiếp xúc thêm với
+những biến thể jailbreak và học cách phản hồi an toàn.
+
+Một tập dữ liệu adversarial training có thể được biểu diễn dưới dạng
+
+\begin{equation}
+    \mathcal{D}_{\mathrm{adv}}
+    =
+    \left\{
+        (x_{\mathrm{adv}}^{(i)}, y_{\mathrm{safe}}^{(i)})
+    \right\}_{i=1}^{N},
+    \label{eq:adversarial-training-dataset}
+\end{equation}
+
+trong đó $x_{\mathrm{adv}}^{(i)}$ là đầu vào có tính adversarial và
+$y_{\mathrm{safe}}^{(i)}$ là phản hồi an toàn mong muốn. Mô hình được tối
+ưu để duy trì hành vi từ chối hoặc chuyển hướng phù hợp trước các biến thể
+đầu vào này.
+
+Ưu điểm của adversarial training là nó cải thiện trực tiếp hành vi của mô
+hình, thay vì chỉ đặt thêm một lớp lọc bên ngoài. Nếu tập attack đủ đa
+dạng, mô hình có thể học được các đặc trưng ngữ nghĩa của yêu cầu không an
+toàn thay vì chỉ nhận diện mẫu bề mặt.
+
+Tuy nhiên, adversarial training có hai thách thức lớn. Thứ nhất, không
+gian jailbreak gần như không giới hạn, nên dữ liệu huấn luyện khó bao phủ
+được mọi biến thể. Thứ hai, nếu huấn luyện quá thiên về từ chối, mô hình
+có thể tăng over-refusal và làm giảm utility trên yêu cầu hợp lệ. Vì vậy,
+adversarial training cần đi kèm đánh giá trên cả harmful prompts và benign
+prompts.
+
+\subsection{Inference-time defenses}
+\label{subsec:inference-time-defenses}
+
+Inference-time defenses là các phương pháp được áp dụng trong quá trình
+suy luận, không nhất thiết phải thay đổi tham số của mô hình. Nhóm này
+đặc biệt hữu ích khi nhà triển khai không có khả năng fine-tune mô hình
+hoặc muốn bổ sung lớp bảo vệ độc lập với model provider.
+
+Một hướng tiêu biểu là kiểm tra độ ổn định của mô hình trước các biến thể
+nhỏ của prompt. SmoothLLM dựa trên quan sát rằng một số adversarial prompts
+có tính giòn trước các thay đổi ký tự nhỏ. Phương pháp này tạo nhiều bản
+biến đổi của cùng một prompt, truy vấn mô hình trên các bản đó, rồi tổng
+hợp kết quả để phát hiện đầu vào đáng ngờ \cite{robey2023smoothllm}.
+
+Ở mức khái quát, một inference-time defense dạng smoothing có thể được mô
+tả như sau. Với prompt đầu vào $x$, hệ thống tạo ra $K$ biến thể:
+
+\begin{equation}
+    \tilde{x}_1, \tilde{x}_2, \ldots, \tilde{x}_K
+    \sim
+    \mathcal{P}(x),
+    \label{eq:prompt-perturbation}
+\end{equation}
+
+trong đó $\mathcal{P}$ là phân phối biến đổi. Sau đó hệ thống đánh giá các
+phản hồi tương ứng và đưa ra quyết định cuối cùng bằng hàm tổng hợp:
+
+\begin{equation}
+    d
+    =
+    g
+    \left(
+        F_{\theta}(\tilde{x}_1),
+        F_{\theta}(\tilde{x}_2),
+        \ldots,
+        F_{\theta}(\tilde{x}_K)
+    \right).
+    \label{eq:smoothing-aggregation}
+\end{equation}
+
+Các biến thể sau này như SemanticSmooth mở rộng ý tưởng smoothing từ biến
+đổi ký tự sang biến đổi ngữ nghĩa, nhằm tăng độ bền trước các attack không
+chỉ phụ thuộc vào token-level perturbation \cite{ji2024semanticsmooth}.
+
+Ưu điểm của inference-time defenses là có thể triển khai mà không cần huấn
+luyện lại mô hình chính. Tuy nhiên, chúng thường làm tăng chi phí suy luận
+vì cần nhiều lần gọi mô hình hoặc guard model. Ngoài ra, nếu attacker biết
+cơ chế phòng thủ, họ có thể thiết kế adaptive attack để tạo đầu vào ổn định
+hơn qua các biến thể.
+
+\subsection{Output moderation}
+\label{subsec:output-moderation}
+
+Output moderation là lớp kiểm tra phản hồi sau khi mô hình đã sinh nội
+dung nhưng trước khi gửi cho người dùng. Lớp này có thể dùng rule-based
+filter, classifier hoặc guard model để đánh giá xem phản hồi có vi phạm
+chính sách hay không.
+
+Output moderation có vai trò quan trọng vì input filtering không phải lúc
+nào cũng dự đoán được phản hồi cuối cùng. Một prompt ban đầu có thể trông
+hợp lệ nhưng mô hình lại sinh nội dung không phù hợp; ngược lại, một prompt
+có dấu hiệu rủi ro có thể vẫn dẫn đến phản hồi an toàn. Do đó, kiểm tra
+đầu ra giúp giảm rủi ro ở bước cuối của pipeline.
+
+Tuy nhiên, output moderation cũng có hạn chế. Nếu phản hồi đã được sinh
+đầy đủ, hệ thống đã tiêu tốn chi phí suy luận trước khi phát hiện lỗi.
+Ngoài ra, nếu output guard quá nghiêm ngặt, nó có thể chặn các phản hồi hợp
+lệ, đặc biệt trong các ngữ cảnh giáo dục, nghiên cứu, y tế hoặc an toàn
+công cộng. Vì vậy, output moderation cần phân biệt giữa nội dung gây hại
+và nội dung phân tích an toàn ở mức phù hợp.
+
+Trong agentic systems, output moderation không nên chỉ kiểm tra văn bản
+cuối cùng. Hệ thống còn cần kiểm tra các lời gọi công cụ, tham số hành động
+và trạng thái trung gian, vì rủi ro có thể xảy ra trước khi phản hồi cuối
+được tạo ra.
+
+\subsection{Representation-level defenses}
+\label{subsec:representation-level-defenses}
+
+Representation-level defenses cố gắng phát hiện hoặc can thiệp vào các
+biểu diễn bên trong của mô hình, thay vì chỉ kiểm tra prompt hoặc output ở
+dạng văn bản. Ý tưởng chung là các yêu cầu có rủi ro hoặc adversarial có
+thể tạo ra những mẫu kích hoạt khác biệt trong hidden states, attention
+patterns hoặc embedding space.
+
+Một hướng tiếp cận là huấn luyện classifier trên biểu diễn trung gian của
+mô hình để phân biệt giữa benign prompts và adversarial prompts. Một hướng
+khác là can thiệp vào activation để làm giảm khả năng mô hình đi theo
+hành vi không mong muốn.
+
+Ưu điểm của representation-level defenses là chúng có thể phát hiện những
+tín hiệu không dễ thấy ở bề mặt văn bản. Tuy nhiên, nhóm phương pháp này
+thường yêu cầu quyền truy cập sâu vào mô hình, khó áp dụng với API đóng và
+có thể phụ thuộc mạnh vào kiến trúc cụ thể. Ngoài ra, việc can thiệp vào
+biểu diễn bên trong có thể ảnh hưởng đến utility nếu không được hiệu chỉnh
+cẩn thận.
+
+Vì vậy, representation-level defenses phù hợp hơn với bối cảnh nghiên cứu
+hoặc mô hình mã nguồn mở, trong khi các hệ thống thương mại đóng thường
+dựa nhiều hơn vào guard model, input/output moderation và system-level
+controls.
+
+\subsection{Guard models}
+\label{subsec:guard-models}
+
+Guard model là một mô hình phụ được dùng để đánh giá mức độ an toàn của
+input, output hoặc hành động trung gian. Khác với rule-based filter, guard
+model có thể học biểu diễn ngữ nghĩa phức tạp hơn và xử lý những prompt
+không khớp với mẫu cố định.
+
+Có thể triển khai guard model ở nhiều vị trí:
+
+\begin{enumerate}[leftmargin=1.2cm]
+    \item \textbf{Input guard:}
+    đánh giá prompt trước khi đưa vào LLM chính;
+
+    \item \textbf{Output guard:}
+    đánh giá phản hồi trước khi gửi cho người dùng;
+
+    \item \textbf{Tool guard:}
+    kiểm tra lời gọi công cụ và tham số hành động;
+
+    \item \textbf{Trajectory guard:}
+    đánh giá toàn bộ chuỗi quan sát, kế hoạch và hành động của agent.
+\end{enumerate}
+
+Guard models giúp tách nhiệm vụ sinh nội dung khỏi nhiệm vụ đánh giá an
+toàn. Điều này có lợi vì mô hình chính có thể tối ưu cho khả năng hỗ trợ
+người dùng, trong khi guard model tập trung vào chính sách an toàn. Tuy
+nhiên, guard model cũng có thể bị lỗi, bị né tránh hoặc tạo ra over-refusal.
+
+Một vấn đề quan trọng là guard model cần được đánh giá độc lập. Nếu guard
+được dùng làm evaluator trong benchmark, nhưng chính guard đó cũng được
+dùng trong hệ thống phòng thủ, kết quả đánh giá có thể bị thiên lệch. Do
+đó, các benchmark như HarmBench nhấn mạnh nhu cầu chuẩn hóa dữ liệu, attack
+artifacts và phương pháp chấm điểm khi so sánh các defense
+\cite{mazeika2024harmbench}.
+
+\subsection{Defense-in-depth}
+\label{subsec:defense-in-depth}
+
+Không có một cơ chế phòng thủ đơn lẻ nào đủ để bảo vệ hoàn toàn hệ thống
+LLM trước jailbreak. Input filtering có thể bỏ sót các prompt được diễn
+đạt tinh vi. Safety alignment có thể không bao phủ mọi biến thể đầu vào.
+Output moderation có thể phát hiện muộn. Guard models có thể sai hoặc bị
+attacker thích nghi. Vì vậy, hệ thống thực tế thường cần defense-in-depth,
+tức là kết hợp nhiều lớp phòng thủ.
+
+Hình~\ref{fig:layered-safety-architecture-defense} minh họa một kiến trúc
+phòng thủ nhiều lớp cho hệ thống LLM có khả năng gọi công cụ.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    >=Latex,
+    node distance=0.65cm,
+    component/.style={
+        draw,
+        rounded corners=3pt,
+        align=center,
+        minimum width=2.35cm,
+        minimum height=1.0cm,
+        text width=2.1cm,
+        inner sep=5pt
+    },
+    external/.style={
+        draw,
+        dashed,
+        rounded corners=3pt,
+        align=center,
+        minimum width=2.35cm,
+        minimum height=1.0cm,
+        text width=2.1cm,
+        inner sep=5pt
+    },
+    arrow/.style={
+        ->,
+        thick
+    }
+]
+
+\node[external] (user) {
+    \textbf{Người dùng}\\
+    Prompt đầu vào
+};
+
+\node[component, right=of user] (inputguard) {
+    \textbf{Input guard}\\
+    Kiểm tra prompt
+};
+
+\node[component, right=of inputguard] (llm) {
+    \textbf{Aligned LLM}\\
+    Sinh phản hồi
+};
+
+\node[component, right=of llm] (outputguard) {
+    \textbf{Output guard}\\
+    Kiểm tra output
+};
+
+\node[external, right=of outputguard] (response) {
+    \textbf{Phản hồi}\\
+    Đến người dùng
+};
+
+\node[component, below=1.05cm of llm] (controller) {
+    \textbf{Action controller}\\
+    Kiểm tra công cụ
+};
+
+\node[external, below=1.05cm of controller] (tools) {
+    \textbf{Tools/Environment}\\
+    Dữ liệu và hành động
+};
+
+\node[component, below=1.05cm of inputguard] (monitor) {
+    \textbf{Monitoring}\\
+    Log và cảnh báo
+};
+
+\draw[arrow] (user) -- (inputguard);
+\draw[arrow] (inputguard) -- (llm);
+\draw[arrow] (llm) -- (outputguard);
+\draw[arrow] (outputguard) -- (response);
+
+\draw[arrow] (llm) -- (controller);
+\draw[arrow] (controller) -- (tools);
+\draw[arrow, bend right=25] (tools.east) to (llm.south east);
+
+\draw[arrow, dashed] (inputguard) -- (monitor);
+\draw[arrow, dashed] (controller.west) to (monitor.east);
+
+\end{tikzpicture}
+\caption{Kiến trúc phòng thủ nhiều lớp cho hệ thống LLM có khả năng gọi
+công cụ.}
+\label{fig:layered-safety-architecture-defense}
+\end{figure}
+
+Trong kiến trúc này, input guard giảm rủi ro trước khi prompt đến mô hình.
+Aligned LLM chịu trách nhiệm sinh phản hồi theo chính sách đã học.
+Output guard kiểm tra nội dung trước khi trả về người dùng. Action
+controller giới hạn quyền của công cụ, kiểm tra tham số hành động và có
+thể yêu cầu xác nhận cho các thao tác quan trọng. Monitoring ghi nhận log,
+phát hiện bất thường và hỗ trợ phân tích sau sự cố.
+
+Defense-in-depth đặc biệt quan trọng đối với agentic systems. Khi LLM có
+thể gọi công cụ, truy cập dữ liệu hoặc thực hiện hành động, rủi ro không
+chỉ nằm ở văn bản cuối cùng. Một hệ thống an toàn cần kiểm soát cả prompt,
+context, kế hoạch, lời gọi công cụ, output và trạng thái môi trường.
+
+\subsection{Hạn chế của các phương pháp phòng thủ}
+\label{subsec:defense-limitations}
+
+Mặc dù các phương pháp phòng thủ có thể giảm rủi ro jailbreak, chúng vẫn
+có những hạn chế chung.
+
+Thứ nhất, không gian đầu vào ngôn ngữ tự nhiên rất lớn. Một defense được
+đánh giá tốt trên một tập attack cố định có thể không bền vững trước các
+biến thể mới hoặc adaptive attacks. Do đó, kết quả trên benchmark cần được
+hiểu như bằng chứng thực nghiệm, không phải bảo đảm tuyệt đối.
+
+Thứ hai, safety và utility thường có sự đánh đổi. Một defense quá nghiêm
+ngặt có thể làm giảm unsafe compliance nhưng đồng thời tăng over-refusal.
+Điều này làm hệ thống kém hữu ích, đặc biệt trong các ngữ cảnh mà người
+dùng có nhu cầu hợp lệ như học tập, nghiên cứu hoặc phân tích rủi ro.
+
+Thứ ba, nhiều defense làm tăng chi phí triển khai. Inference-time defenses
+có thể cần nhiều lần gọi mô hình; guard models cần tài nguyên riêng;
+monitoring và human confirmation làm tăng độ phức tạp vận hành. Vì vậy,
+lựa chọn defense cần cân bằng giữa mức rủi ro, chi phí và yêu cầu ứng dụng.
+
+Thứ tư, defense có thể bị attacker thích nghi. Nếu attacker biết hệ thống
+dùng input guard, output guard hoặc smoothing, họ có thể điều chỉnh prompt
+để tối ưu qua các lớp đó. Vì vậy, một defense đáng tin cậy cần được đánh
+giá trong cả thiết lập static và adaptive.
+
+\subsection{Tổng kết chương}
+\label{subsec:jailbreak-defenses-summary}
+
+Chương này đã trình bày các nhóm phòng thủ chính trước jailbreak, bao gồm
+input filtering, prompt preprocessing, adversarial training,
+inference-time defenses, output moderation, representation-level defenses,
+guard models và defense-in-depth. Mỗi nhóm defense có ưu điểm và hạn chế
+riêng, phụ thuộc vào vị trí triển khai, quyền truy cập mô hình, chi phí
+suy luận và loại attack cần chống lại.
+
+Một kết luận quan trọng là không nên phụ thuộc vào một lớp phòng thủ duy
+nhất. Jailbreak là một bài toán động, trong đó attacker có thể thay đổi
+cách diễn đạt, tự động hóa tìm kiếm prompt hoặc thích nghi với defense.
+Do đó, các hệ thống thực tế cần kết hợp nhiều lớp bảo vệ và đánh giá chúng
+trên cả safety, utility, over-refusal, chi phí và khả năng chống adaptive
+attacks.
+
+Chương tiếp theo trình bày các phương pháp evaluation và benchmark dùng để
+đo lường attack success, refusal, harmfulness, utility và độ bền vững của
+các defense.

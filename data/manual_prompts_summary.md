@@ -1,6 +1,6 @@
-## Tóm tắt phân loại prompt jailbreak thủ công
+# Tóm tắt phân loại prompt jailbreak thủ công
 
-### Bảng 1. Phân loại các prompt jailbreak thủ công
+## Bảng 1. Phân loại các prompt jailbreak thủ công
 
 | ID | Mô tả ngắn                                                        | Kỹ thuật jailbreak                                        | Loại nội dung rủi ro                               |
 | -: | ----------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------- |
@@ -38,7 +38,7 @@
 
 ---
 
-### Bảng 2. Tóm tắt theo kỹ thuật jailbreak
+## Bảng 2. Tóm tắt theo kỹ thuật jailbreak
 
 | Kỹ thuật jailbreak                 | Mô tả                                                                                                                   | ID prompt liên quan                                |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
@@ -51,7 +51,7 @@
 
 ---
 
-### Bảng 3. Tóm tắt theo loại nội dung rủi ro
+## Bảng 3. Tóm tắt theo loại nội dung rủi ro
 
 | Loại nội dung rủi ro                       | Mô tả                                                                                                            | ID prompt liên quan                   |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
@@ -64,6 +64,6 @@
 
 ---
 
-### Tóm tắt ngắn cho báo cáo
+## Tóm tắt ngắn cho báo cáo
 
 Tập prompt manual bao phủ nhiều phong cách jailbreak khác nhau, bao gồm làm nhiễu ở mức token, nhập vai persona, ghi đè chính sách, giả lập quyền hệ thống, tạo áp lực thời gian và yêu cầu rủi ro trực tiếp. Xét theo nội dung rủi ro, các prompt tập trung chủ yếu vào hành vi bất hợp pháp, gian lận, lạm dụng mạng, thù ghét hoặc quấy rối, thông tin sai lệch và một số ít trường hợp liên quan đến gây hại thể chất hoặc nội dung chính trị tương đối hợp lệ.

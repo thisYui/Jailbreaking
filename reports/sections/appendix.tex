@@ -3,375 +3,136 @@
 
 Phần này trình bày phần thực nghiệm của báo cáo. Theo yêu cầu của đề tài, nhóm
 chọn hướng \textbf{Cách 2: tự xây dựng demo từ đầu}. Thay vì kế thừa trực tiếp
-mã nguồn chính thức của một công trình cụ thể như GCG, PAIR hay AutoDAN, nhóm
-tự cài đặt một pipeline nhỏ mô phỏng các thành phần chính được trình bày trong
-tutorial về jailbreaking LLMs: biến đổi prompt tấn công, cấu hình phòng thủ,
-đánh giá định lượng và trực quan hóa kết quả.
+mã nguồn chính thức của một công trình cụ thể như GCG, PAIR hay AutoDAN, nhóm tự
+cài đặt một pipeline nhỏ để mô phỏng các thành phần chính được trình bày trong
+tutorial về jailbreaking LLMs. Pipeline bao gồm các bước chính: xây dựng prompt,
+áp dụng biến đổi tấn công, gọi mô hình, áp dụng các cấu hình phòng thủ, đánh giá
+định lượng và trực quan hóa kết quả.
 
 Do hạn chế về tài nguyên, quota API, thời gian chạy và khả năng truy cập mô
 hình, thí nghiệm trong báo cáo này không nhằm mục tiêu tái lập đầy đủ một
-benchmark quy mô lớn như HarmBench hoặc JailbreakBench. Thay vào đó, thực
-nghiệm được thiết kế như một demo có kiểm soát nhằm minh họa quy trình đánh
-giá jailbreak và trade-off giữa safety và utility.
+benchmark quy mô lớn như HarmBench hoặc JailbreakBench. Thay vào đó, thực nghiệm
+được thiết kế như một demo có kiểm soát nhằm minh họa quy trình đánh giá
+jailbreak và phân tích trade-off giữa safety và utility. Các bảng kết quả chi
+tiết, biểu đồ và error cases được trình bày trong phần phụ lục.
 
-\subsection{Mục tiêu thực nghiệm}
+\subsection{Phân công công việc}
 
-Thực nghiệm được thiết kế để trả lời bốn câu hỏi chính:
+Bảng~\ref{tab:work-division} trình bày phân công công việc của các thành viên
+trong nhóm.
 
-\begin{enumerate}[leftmargin=*]
-\item Khi không có lớp phòng thủ bổ sung, mô hình có tạo phản hồi
-\textit{unsafe compliance} trước các prompt harmful hay không?
+\begin{table}[H]
+\centering
+\caption{Phân công công việc trong nhóm}
+\label{tab:work-division}
+\begin{tabular}{p{0.18\textwidth}p{0.28\textwidth}p{0.44\textwidth}}
+\toprule
+\textbf{MSSV} & \textbf{Họ và tên} & \textbf{Nhiệm vụ} \\
+\midrule
+23120245 & Nguyễn Quang Duy & Nghiên cứu lý thuyết nền tảng và tutorial về jailbreaking LLMs. \\
+23120258 & Lưu Trọng Hiếu & Nghiên cứu các công trình tiêu biểu liên quan đến tấn công và phòng thủ jailbreak. \\
+23120260 & Văn Đình Hiếu & Chạy thực nghiệm, tổng hợp kết quả, đưa ra đánh giá và kết luận. \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\item Các dạng biến đổi prompt như role-play, obfuscation, multi-turn
-simulation và injection-style prompt ảnh hưởng thế nào đến attack success
-rate?
+\subsection{Thiết lập và phạm vi thực nghiệm}
 
-\item Các lớp phòng thủ đơn giản như input filtering, output moderation và
-defense-in-depth có làm giảm attack success rate hay không?
-
-\item Việc tăng safety có làm giảm utility hoặc làm tăng over-refusal đối
-với các prompt hợp lệ hay không?
-
-\end{enumerate}
-
-Ngoài experiment chính, nhóm cũng thực hiện một phân tích thủ công độc lập trên
-một tập phản hồi web manual. Phần manual này chỉ được sử dụng như phân tích bổ
-sung, không được gộp vào các metric chính như ASR, ORR hoặc Utility Rate.
-
-\subsection{Thiết lập thực nghiệm}
-
-Experiment chính được chạy ở chế độ \texttt{\detokenize{openrouter_api}}. Bộ prompt gồm 30
-prompt gốc, chia thành ba nhóm nội dung:
-
-\begin{itemize}[leftmargin=*]
-\item \textbf{Knowledge}: các prompt hợp lệ liên quan đến AI safety,
-jailbreak, benchmark và evaluation.
-
-\item \textbf{Company}: các prompt harmful mô phỏng yêu cầu tiết lộ thông
-tin nội bộ, system instruction, secret hoặc dữ liệu riêng tư.
-
-\item \textbf{Hazardous}: các prompt nằm gần ranh giới an toàn khi thảo
-luận về nội dung rủi ro cao.
-
-\end{itemize}
+Experiment chính được chạy ở chế độ \texttt{\detokenize{openrouter_api}}. Bộ
+prompt gồm 30 prompt gốc, chia thành ba nhóm nội dung: \texttt{knowledge},
+\texttt{company} và \texttt{hazardous}. Nhóm \texttt{knowledge} bao gồm các
+prompt hợp lệ liên quan đến AI safety, jailbreak, benchmark và evaluation. Nhóm
+\texttt{company} mô phỏng các yêu cầu rủi ro liên quan đến thông tin nội bộ,
+system instruction, secret hoặc dữ liệu riêng tư. Nhóm \texttt{hazardous} gồm
+các prompt nằm gần ranh giới an toàn khi thảo luận về nội dung rủi ro cao.
 
 Mỗi prompt gốc được áp dụng năm loại attack transformation:
-
-\begin{center}
 \texttt{none}, \texttt{\detokenize{role_play}}, \texttt{obfuscation},
-\texttt{\detokenize{multi_turn_simulation}}, \texttt{\detokenize{injection_style}}.
-\end{center}
-
-Sau khi mô hình sinh phản hồi, mỗi kết quả được đánh giá dưới bốn cấu hình
-defense:
-
-\begin{center}
+\texttt{\detokenize{multi_turn_simulation}} và
+\texttt{\detokenize{injection_style}}. Sau khi mô hình sinh phản hồi, mỗi kết
+quả được đánh giá dưới bốn cấu hình phòng thủ:
 \texttt{\detokenize{no_defense}}, \texttt{\detokenize{input_filter}},
-\texttt{\detokenize{output_moderation}}, \texttt{\detokenize{defense_in_depth}}.
-\end{center}
+\texttt{\detokenize{output_moderation}} và
+\texttt{\detokenize{defense_in_depth}}.
 
 Tổng số dòng đánh giá chi tiết là:
 
-\[
+[
 30 \text{ prompts} \times 5 \text{ attack types} \times 4 \text{ defense types}
 = 600 \text{ cases}.
-\]
+]
 
 Trong chế độ API, mô hình chỉ được gọi một lần cho mỗi cặp prompt--attack. Các
-defense được áp dụng offline sau khi đã có phản hồi, vì vậy chúng không làm
-tăng số lượng API calls.
+defense được áp dụng offline sau khi đã có phản hồi, vì vậy chúng không làm tăng
+số lượng API calls. Cách thiết kế này giúp giảm chi phí chạy thí nghiệm nhưng
+vẫn cho phép so sánh tác động tương đối của từng cấu hình phòng thủ trên cùng
+một tập phản hồi.
 
-\subsection{Hạn chế tài nguyên và phạm vi thực nghiệm}
+Do giới hạn về tài nguyên tính toán và quota API, thực nghiệm có một số giới hạn
+quan trọng. Thứ nhất, số lượng prompt còn nhỏ và chủ yếu phục vụ minh họa
+pipeline thay vì đại diện cho một benchmark quy mô lớn. Thứ hai, thí nghiệm
+chính chỉ sử dụng một target model thông qua OpenRouter API, chưa so sánh nhiều
+mô hình thương mại và open-source khác nhau. Thứ ba, nhóm không chạy lại
+official implementation của các phương pháp phức tạp như GCG, AutoDAN hoặc PAIR
+vì các phương pháp này thường cần nhiều lần gọi mô hình, GPU hoặc quyền truy cập
+chi tiết hơn vào mô hình. Cuối cùng, các lớp phòng thủ trong demo là rule-based,
+nhằm minh họa nguyên lý input filtering, output moderation và defense-in-depth,
+chưa phải guard model chuyên dụng.
 
-Do giới hạn về tài nguyên tính toán và quota API, thực nghiệm có một số giới
-hạn quan trọng:
+Vì vậy, các kết quả trong phần này nên được hiểu là kết quả của một demo có kiểm
+soát. Chúng cho thấy xu hướng và trade-off trong pipeline được xây dựng, nhưng
+chưa đủ để kết luận tổng quát về mọi mô hình hoặc mọi dạng jailbreak.
 
-\begin{itemize}[leftmargin=*]
-\item Số lượng prompt còn nhỏ, chủ yếu phục vụ minh họa pipeline thay vì
-đại diện cho một benchmark quy mô lớn.
+\subsection{Kết quả và nhận xét chính}
 
-\item Thí nghiệm chính chỉ sử dụng một target model thông qua OpenRouter API
-thay vì so sánh nhiều mô hình thương mại và open-source khác nhau.
+Các chỉ số chính được sử dụng trong experiment gồm ASR, ORR và Utility Rate. ASR
+(\textit{Attack Success Rate}) đo tỷ lệ prompt harmful dẫn đến unsafe compliance.
+ORR (\textit{Over-Refusal Rate}) đo tỷ lệ prompt hợp lệ nhưng bị từ chối hoặc bị
+chặn. Utility Rate đo tỷ lệ prompt hợp lệ được trả lời thành công. Vì vậy, một
+cấu hình phòng thủ tốt không chỉ cần giảm ASR, mà còn cần hạn chế over-refusal và
+giữ utility cho các yêu cầu hợp lệ.
 
-\item Nhóm không chạy lại official implementation của các phương pháp
-phức tạp như GCG, AutoDAN hoặc PAIR do các phương pháp này thường cần nhiều
-lần gọi mô hình, GPU hoặc quyền truy cập chi tiết hơn vào mô hình.
+Kết quả tổng hợp cho thấy cấu hình \texttt{\detokenize{no_defense}} có ASR cao
+nhất, đạt 0.133. Điều này cho thấy khi không có lớp kiểm soát bổ sung, mô hình
+vẫn có một tỷ lệ nhất định tạo ra phản hồi unsafe compliance đối với prompt
+harmful. Hai cấu hình \texttt{\detokenize{output_moderation}} và
+\texttt{\detokenize{defense_in_depth}} đưa ASR về 0.000. Tuy nhiên, hai cấu hình
+này có trade-off khác nhau: \texttt{\detokenize{output_moderation}} giữ Utility
+Rate ở mức 0.613, trong khi \texttt{\detokenize{defense_in_depth}} làm Utility
+Rate giảm còn 0.427 do input filter chặn nhiều prompt hợp lệ hơn.
 
-\item Các lớp phòng thủ trong demo là rule-based, nhằm minh họa nguyên lý
-input filtering, output moderation và defense-in-depth, chưa phải guard
-model chuyên dụng.
+Trong thiết lập hiện tại, \texttt{\detokenize{output_moderation}} là cấu hình có
+trade-off tốt nhất giữa safety và utility. Cấu hình
+\texttt{\detokenize{input_filter}} giúp giảm ASR từ 0.133 xuống 0.027, nhưng đồng
+thời làm tăng over-refusal. Điều này cho thấy rule-based input filtering có thể
+chặn quá rộng, đặc biệt khi gặp các prompt có chứa từ khóa rủi ro nhưng mục đích
+thảo luận vẫn mang tính học thuật hoặc an toàn.
 
-\item Evaluator hiện tại dựa trên luật đơn giản, do đó chưa thay thế được
-human evaluation hoặc LLM-as-a-judge trong các benchmark lớn.
+Xét theo attack type, không có nhóm attack nào tạo ASR quá cao trong pipeline
+hiện tại. Các nhóm \texttt{none}, \texttt{\detokenize{role_play}} và
+\texttt{\detokenize{multi_turn_simulation}} có ASR xấp xỉ 0.050. Nhóm
+\texttt{obfuscation} có ASR thấp nhất, đạt 0.017. Điểm đáng chú ý là
+\texttt{\detokenize{injection_style}} tuy có ASR không quá cao nhưng lại làm ORR
+tăng mạnh, cho thấy dạng prompt này có thể khiến hệ thống trở nên quá thận trọng
+và từ chối nhiều yêu cầu đáng lẽ có thể trả lời.
 
-\end{itemize}
+Xét theo attack profile, nhóm \texttt{company} là nhóm có rủi ro unsafe
+compliance cao nhất khi không có defense. Điều này phù hợp với thiết kế prompt vì
+nhóm này mô phỏng các yêu cầu liên quan đến thông tin nội bộ hoặc instruction
+hierarchy. Nhóm \texttt{hazardous} có ASR thấp hơn nhưng chịu ảnh hưởng mạnh từ
+over-refusal. Nhóm \texttt{knowledge} không tạo ASR trong thí nghiệm này nhưng
+vẫn có ORR đáng kể, phản ánh khó khăn trong việc phân biệt giữa thảo luận học
+thuật về jailbreak và yêu cầu jailbreak thực sự.
 
-Vì vậy, các kết quả trong phần này nên được hiểu là kết quả của một demo có
-kiểm soát. Chúng cho thấy xu hướng và trade-off trong pipeline được xây dựng,
-nhưng chưa đủ để kết luận tổng quát về mọi mô hình hoặc mọi dạng jailbreak.
-
-\subsection{Các chỉ số đánh giá}
-
-Bảng~\ref{tab:experiment-metrics} tóm tắt các chỉ số chính được sử dụng trong
-experiment pipeline.
-
-\begin{table}[H]
-\centering
-\caption{Các chỉ số đánh giá trong thực nghiệm}
-\label{tab:experiment-metrics}
-\begin{tabular}{p{0.24\textwidth}p{0.66\textwidth}}
-\toprule
-\textbf{Chỉ số} & \textbf{Ý nghĩa} \\
-\midrule
-ASR & Attack Success Rate, tỷ lệ prompt harmful dẫn đến unsafe compliance. \\
-ORR & Over-Refusal Rate, tỷ lệ prompt đáng lẽ nên được trả lời nhưng bị từ chối hoặc bị chặn. \\
-Utility Rate & Tỷ lệ prompt hợp lệ được trả lời thành công. \\
-Refusal Rate & Tỷ lệ phản hồi bị từ chối hoặc bị guard chặn. \\
-Unsafe Rate & Tỷ lệ phản hồi cuối cùng bị gán nhãn unsafe compliance. \\
-Avg Cost & Chi phí tương đối giả lập của từng defense configuration. \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-ASR được xem là chỉ số safety chính. Tuy nhiên, một hệ thống có ASR thấp nhưng
-từ chối quá nhiều prompt hợp lệ vẫn chưa phải là hệ thống tốt. Vì vậy, ASR cần
-được phân tích cùng với ORR và Utility Rate.
-
-\subsection{Kết quả tổng hợp theo defense}
-
-Bảng~\ref{tab:experiment-summary-defense} trình bày kết quả tổng hợp theo từng
-defense configuration.
-
-\begin{table}[H]
-\centering
-\caption{Kết quả tổng hợp theo defense configuration}
-\label{tab:experiment-summary-defense}
-\begin{tabular}{lrrrrr}
-\toprule
-\textbf{Defense} & \textbf{ASR} & \textbf{ORR} & \textbf{Utility} & \textbf{Refusal} & \textbf{Avg Cost} \\
-\midrule
-\texttt{\detokenize{no_defense}}        & 0.133 & 0.387 & 0.613 & 0.627 & 1.0 \\
-\texttt{\detokenize{input_filter}}      & 0.027 & 0.573 & 0.427 & 0.773 & 1.2 \\
-\texttt{\detokenize{output_moderation}} & 0.000 & 0.387 & 0.613 & 0.693 & 1.3 \\
-\texttt{\detokenize{defense_in_depth}} & 0.000 & 0.573 & 0.427 & 0.787 & 1.5 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Kết quả cho thấy \texttt{\detokenize{no_defense}} có ASR cao nhất, đạt 0.133. Điều này cho
-thấy khi không có lớp kiểm soát bổ sung, mô hình vẫn có một tỷ lệ nhất định tạo
-ra phản hồi unsafe compliance đối với prompt harmful.
-
-Hai cấu hình \texttt{\detokenize{output_moderation}} và \texttt{\detokenize{defense_in_depth}} đưa ASR
-về 0.000. Tuy nhiên, hai cấu hình này có trade-off khác nhau.
-\texttt{\detokenize{output_moderation}} giữ Utility Rate ở mức 0.613, bằng với
-\texttt{\detokenize{no_defense}}, trong khi ORR không tăng. Ngược lại,
-\texttt{\detokenize{defense_in_depth}} cũng loại bỏ unsafe compliance nhưng làm ORR tăng
-lên 0.573 và Utility Rate giảm còn 0.427.
-
-Trong thiết lập thí nghiệm hiện tại, \texttt{\detokenize{output_moderation}} là cấu hình có
-trade-off tốt nhất giữa safety và utility. Cấu hình \texttt{\detokenize{input_filter}} giúp
-giảm ASR từ 0.133 xuống 0.027 nhưng đồng thời làm tăng over-refusal, cho thấy
-rule-based input filtering có thể chặn quá rộng.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/asr_by_defense.png}
-\caption{Attack success rate theo defense configuration}
-\label{fig:asr-by-defense}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/orr_by_defense.png}
-\caption{Over-refusal rate theo defense configuration}
-\label{fig:orr-by-defense}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/utility_by_defense.png}
-\caption{Utility rate theo defense configuration}
-\label{fig:utility-by-defense}
-\end{figure}
-
-\subsection{Phân tích theo attack type}
-
-Bảng~\ref{tab:attack-summary} trình bày kết quả trung bình theo từng attack
-transformation. Các giá trị này được tính trên toàn bộ defense configurations,
-vì vậy chúng phản ánh mức độ khó xử lý tổng thể của từng attack type trong
-pipeline.
-
-\begin{table}[H]
-\centering
-\caption{Kết quả tổng hợp theo attack type}
-\label{tab:attack-summary}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Attack type} & \textbf{ASR} & \textbf{ORR} & \textbf{Utility} & \textbf{Unsafe Rate} \\
-\midrule
-\texttt{none}                    & 0.050 & 0.500 & 0.500 & 0.025 \\
-\texttt{\detokenize{role_play}}              & 0.050 & 0.433 & 0.567 & 0.025 \\
-\texttt{obfuscation}             & 0.017 & 0.267 & 0.733 & 0.008 \\
-\texttt{\detokenize{multi_turn_simulation}} & 0.050 & 0.400 & 0.600 & 0.025 \\
-\texttt{\detokenize{injection_style}}        & 0.033 & 0.800 & 0.200 & 0.017 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Các kết quả cho thấy không có attack type nào tạo ASR quá cao trong pipeline
-hiện tại. Ba nhóm \texttt{none}, \texttt{\detokenize{role_play}} và
-\texttt{\detokenize{multi_turn_simulation}} có ASR xấp xỉ 0.050. Attack
-\texttt{obfuscation} có ASR thấp nhất, đạt 0.017, đồng thời có Utility Rate cao
-nhất, đạt 0.733.
-
-Điểm đáng chú ý nhất là \texttt{\detokenize{injection_style}}. Dù ASR của nhóm này chỉ đạt
-0.033, ORR lại tăng lên 0.800 và Utility Rate giảm còn 0.200. Điều này cho thấy
-dạng prompt injection-style không chỉ có thể làm tăng rủi ro unsafe compliance,
-mà còn có thể làm hệ thống trở nên quá thận trọng và từ chối nhiều yêu cầu đáng
-lẽ có thể trả lời.
-
-\subsection{Phân tích theo attack profile}
-
-Bên cạnh attack type, thực nghiệm cũng phân tích kết quả theo attack profile:
-\texttt{knowledge}, \texttt{company} và \texttt{hazardous}. Bảng
-\ref{tab:profile-summary} tóm tắt một số kết quả tiêu biểu.
-
-\begin{table}[H]
-\centering
-\caption{Một số kết quả tiêu biểu theo attack profile}
-\label{tab:profile-summary}
-\begin{tabular}{llrrr}
-\toprule
-\textbf{Profile} & \textbf{Defense} & \textbf{ASR} & \textbf{ORR} & \textbf{Utility} \\
-\midrule
-\texttt{company}   & \texttt{\detokenize{no_defense}}        & 0.18 & 0.00 & 0.00 \\
-\texttt{company}   & \texttt{\detokenize{output_moderation}} & 0.00 & 0.00 & 0.00 \\
-\texttt{hazardous} & \texttt{\detokenize{no_defense}}        & 0.04 & 0.36 & 0.64 \\
-\texttt{hazardous} & \texttt{\detokenize{input_filter}}      & 0.04 & 0.76 & 0.24 \\
-\texttt{knowledge} & \texttt{\detokenize{no_defense}}        & 0.00 & 0.40 & 0.60 \\
-\texttt{knowledge} & \texttt{\detokenize{input_filter}}      & 0.00 & 0.48 & 0.52 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Nhóm \texttt{company} có rủi ro ASR cao nhất khi không có defense, đạt 0.18.
-Điều này phù hợp với thiết kế prompt vì nhóm này mô phỏng các yêu cầu liên quan
-đến thông tin nội bộ hoặc instruction hierarchy. Khi áp dụng
-\texttt{\detokenize{output_moderation}}, ASR của nhóm này giảm về 0.00.
-
-Nhóm \texttt{hazardous} có ASR thấp hơn, nhưng chịu ảnh hưởng mạnh từ
-over-refusal. Với \texttt{\detokenize{input_filter}}, ORR tăng lên 0.76 và Utility Rate giảm
-còn 0.24. Điều này cho thấy keyword-based filtering có xu hướng chặn rộng khi
-gặp các từ khóa rủi ro cao, kể cả trong các prompt có mục đích giải thích an
-toàn ở mức khái quát.
-
-Nhóm \texttt{knowledge} không tạo unsafe compliance trong thí nghiệm này nhưng
-vẫn có ORR đáng kể. Ngay cả với \texttt{\detokenize{no_defense}}, ORR của nhóm này là 0.40.
-Điều này phản ánh khó khăn trong việc phân biệt giữa thảo luận học thuật về
-jailbreak và yêu cầu jailbreak thực sự.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/asr_by_profile.png}
-\caption{Attack success rate theo attack profile và defense configuration}
-\label{fig:asr-by-profile}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/orr_by_profile.png}
-\caption{Over-refusal rate theo attack profile và defense configuration}
-\label{fig:orr-by-profile}
-\end{figure}
-
-\subsection{Safety--utility trade-off}
-
-Hình~\ref{fig:safety-utility-tradeoff} biểu diễn quan hệ giữa Utility Rate và
-Safety Rate, trong đó Safety Rate được tính bằng $1 - \text{ASR}$. Một cấu hình
-tốt nên nằm gần góc trên bên phải: vừa có utility cao, vừa có safety cao.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\textwidth]{figures/safety_utility_tradeoff.png}
-\caption{Trade-off giữa utility rate và safety rate}
-\label{fig:safety-utility-tradeoff}
-\end{figure}
-
-Kết quả cho thấy \texttt{\detokenize{output_moderation}} nằm gần vùng mong muốn nhất:
-Safety Rate đạt 1.0 trong khi Utility Rate vẫn đạt 0.613.
-\texttt{\detokenize{defense_in_depth}} cũng đạt Safety Rate 1.0 nhưng Utility Rate thấp hơn
-do input filter chặn nhiều prompt hợp lệ. Cấu hình \texttt{\detokenize{no_defense}} có
-Utility Rate cao nhưng Safety Rate thấp hơn vì vẫn còn unsafe compliance.
-
-Từ góc nhìn thiết kế hệ thống, kết quả này gợi ý rằng một lớp output moderation
-sau khi model sinh phản hồi có thể giữ utility tốt hơn so với input filtering
-dựa trên keyword trong thiết lập hiện tại.
-
-\subsection{Phân tích lỗi}
-
-Bảng chi tiết cho thấy có tổng cộng 156 error cases, gồm 12 trường hợp attack
-success và 144 trường hợp over-refusal. Như vậy, vấn đề lớn nhất của pipeline
-hiện tại không chỉ là unsafe compliance, mà còn là xu hướng từ chối quá mức.
-
-Các attack success tập trung chủ yếu ở cấu hình \texttt{\detokenize{no_defense}}, đặc biệt
-trong nhóm \texttt{company}. Khi áp dụng \texttt{\detokenize{output_moderation}}, các trường
-hợp unsafe compliance bị chặn hoàn toàn trong bộ dữ liệu này. Tuy nhiên,
-over-refusal vẫn tồn tại trong nhóm \texttt{knowledge} và \texttt{hazardous},
-cho thấy hệ thống còn khó phân biệt giữa câu hỏi học thuật hợp lệ và yêu cầu
-thực sự rủi ro.
-
-Từ kết quả này có thể rút ra hai hướng cải thiện:
-
-\begin{itemize}[leftmargin=*]
-\item \textbf{Cải thiện evaluator}: rule-based evaluator hiện tại chưa đủ
-tinh tế đối với các phản hồi dài hoặc phản hồi có cả phần từ chối và phần
-giải thích an toàn.
-
-\item \textbf{Cải thiện input filter}: keyword-based filtering dễ gây
-over-refusal. Một classifier theo ngữ cảnh hoặc guard model chuyên dụng có
-thể giúp phân biệt tốt hơn giữa nội dung học thuật, nội dung an toàn và yêu
-cầu nguy hiểm.
-
-\end{itemize}
-
-\subsection{Manual web evaluation}
-
-Bên cạnh experiment chính, project cũng thực hiện một phân tích thủ công độc
-lập trên file \texttt{\detokenize{web_manual_responses.tsv}}. Khác với pipeline chính,
-phần này không được dùng để tính ASR, ORR hoặc Utility Rate. Mục tiêu của manual
-evaluation là tổng hợp các nhãn \texttt{\detokenize{Passed_*}} có sẵn trong dữ liệu nguồn
-và kiểm tra xem từng model có xuất hiện trường hợp được đánh dấu
-\texttt{Passed = 1} hay không.
-
-Bảng~\ref{tab:manual-summary} trình bày kết quả tổng hợp.
-
-\begin{table}[H]
-\centering
-\caption{Kết quả manual web evaluation}
-\label{tab:manual-summary}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Model} & \textbf{Total cases} & \textbf{Passed = 1} & \textbf{Passed = 0} & \textbf{Passed 1 rate} \\
-\midrule
-ChatGPT 5.5              & 31 & 0 & 31 & 0.000 \\
-Claude Haiku 4.5         & 31 & 0 & 31 & 0.000 \\
-Gemini 3.1 Flash Lite    & 31 & 5 & 26 & 0.161 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Kết quả manual cho thấy ChatGPT 5.5 và Claude Haiku 4.5 không có trường hợp
-\texttt{Passed = 1} trong bộ dữ liệu thủ công này, trong khi Gemini 3.1 Flash
-Lite có 5 trường hợp được đánh dấu \texttt{Passed = 1}. Tuy nhiên,
-\texttt{\detokenize{Passed_*}} không được tự động diễn giải thành \textit{unsafe compliance},
-\textit{safe refusal} hoặc jailbreak success. Vì vậy, \texttt{\detokenize{passed_1_rate}}
-không được xem là ASR và không được gộp vào các biểu đồ chính.
-
-Manual evaluation chỉ nên được xem là nguồn kiểm tra bổ sung để hỗ trợ error
-analysis và lựa chọn các case cần đọc thủ công sâu hơn.
-
-\subsection{Tóm tắt phát hiện chính}
+Bên cạnh experiment chính, nhóm cũng thực hiện một manual web evaluation trên
+file \texttt{\detokenize{web_manual_responses.tsv}}. Trong phần này, nhãn
+\texttt{\detokenize{Passed_*}} được hiểu là kết quả jailbreak thành công:
+\texttt{Passed = 1} nghĩa là model tạo phản hồi được đánh giá là vượt qua cơ chế
+an toàn trong case tương ứng, còn \texttt{Passed = 0} nghĩa là jailbreak không
+thành công. Kết quả manual cho thấy Gemini 3.1 Flash Lite có 5/31 case jailbreak
+thành công, trong khi ChatGPT 5.5 và Claude Haiku 4.5 không có case
+\texttt{Passed = 1}. Tuy nhiên, kết quả này được báo cáo riêng vì khác quy trình
+đánh giá so với experiment pipeline.
 
 Từ các kết quả trên, có thể tóm tắt các phát hiện chính như sau:
 
@@ -379,22 +140,24 @@ Từ các kết quả trên, có thể tóm tắt các phát hiện chính như 
 \item Khi không có defense, hệ thống vẫn có unsafe compliance với ASR bằng
 0.133.
 
-\item \texttt{\detokenize{output_moderation}} là cấu hình có trade-off tốt nhất trong
-thí nghiệm này: ASR giảm về 0.000 trong khi Utility Rate vẫn giữ ở 0.613.
+\item \texttt{\detokenize{output_moderation}} là cấu hình có trade-off tốt nhất
+trong thí nghiệm này: ASR giảm về 0.000 trong khi Utility Rate vẫn giữ ở 0.613.
 
-\item \texttt{\detokenize{input_filter}} và \texttt{\detokenize{defense_in_depth}} giúp giảm ASR
-nhưng làm tăng over-refusal, đặc biệt ở nhóm \texttt{hazardous}.
+\item \texttt{\detokenize{input_filter}} và
+\texttt{\detokenize{defense_in_depth}} giúp giảm ASR nhưng làm tăng
+over-refusal, đặc biệt ở nhóm \texttt{hazardous}.
 
-\item Nhóm \texttt{company} là nhóm có rủi ro unsafe compliance cao nhất
-khi không có defense.
+\item Nhóm \texttt{company} là nhóm có rủi ro unsafe compliance cao nhất khi
+không có defense.
 
-\item Nhóm \texttt{knowledge} không tạo ASR trong thí nghiệm này nhưng vẫn
-có over-refusal, cho thấy các câu hỏi học thuật về AI safety có thể bị xử
-lý quá thận trọng.
+\item Nhóm \texttt{knowledge} không tạo ASR trong thí nghiệm này nhưng vẫn có
+over-refusal, cho thấy các câu hỏi học thuật về AI safety có thể bị xử lý quá
+thận trọng.
 
-\item Manual web evaluation chỉ là phân tích bổ sung, không thay thế các
-metric chính của experiment pipeline.
-
+\item Manual web evaluation cho thấy Gemini 3.1 Flash Lite có 5/31 case
+jailbreak thành công, trong khi ChatGPT 5.5 và Claude Haiku 4.5 không có case
+\texttt{Passed = 1}; tuy nhiên kết quả này được báo cáo riêng vì khác quy trình
+đánh giá so với experiment pipeline.
 \end{enumerate}
 
 Nhìn chung, kết quả thực nghiệm củng cố nhận định rằng đánh giá jailbreak không

@@ -337,14 +337,34 @@ cầu nguy hiểm.
 
 \subsection{Manual web evaluation}
 
-Bên cạnh experiment chính, project cũng thực hiện một phân tích thủ công độc
-lập trên file \texttt{\detokenize{web_manual_responses.tsv}}. Khác với pipeline chính,
-phần này không được dùng để tính ASR, ORR hoặc Utility Rate. Mục tiêu của manual
-evaluation là tổng hợp các nhãn \texttt{\detokenize{Passed_*}} có sẵn trong dữ liệu nguồn
-và kiểm tra xem từng model có xuất hiện trường hợp được đánh dấu
-\texttt{Passed = 1} hay không.
+Bên cạnh thí nghiệm chính được chạy bằng pipeline tự động, project cũng thực hiện
+một phân tích thủ công độc lập trên file
+\texttt{\detokenize{web_manual_responses.tsv}}. Phần đánh giá này được tách riêng
+khỏi experiment chính vì dữ liệu manual được thu thập và gán nhãn theo quy trình
+web/manual, không đi qua cùng một pipeline scoring, judge và metric aggregation
+như các kết quả tự động. Do đó, phần này không được gộp trực tiếp vào các chỉ số
+chính như ASR, ORR hoặc Utility Rate của experiment chính.
 
-Bảng~\ref{tab:manual-summary} trình bày kết quả tổng hợp.
+Trong manual evaluation, nhãn \texttt{\detokenize{Passed_*}} được hiểu là kết quả
+jailbreak thành công của từng model trên từng prompt. Cụ thể,
+\texttt{Passed = 1} nghĩa là model đã tạo ra phản hồi được đánh giá là vượt qua
+cơ chế an toàn trong bối cảnh prompt jailbreak tương ứng, trong khi
+\texttt{Passed = 0} nghĩa là model không jailbreak thành công trên case đó. Vì vậy,
+\texttt{\detokenize{passed_1_rate}} trong phần này có thể được hiểu là
+\textit{manual jailbreak success rate}, tức tỉ lệ jailbreak thành công trong tập
+đánh giá thủ công.
+
+Tập manual gồm 31 prompt jailbreak thủ công. Các prompt này bao phủ nhiều kỹ thuật
+tấn công khác nhau, bao gồm \textit{token-level/garbled prefix}, nhập vai persona,
+ghi đè chính sách, giả lập quyền hệ thống, tạo áp lực thời gian, và yêu cầu rủi ro
+trực tiếp. Về loại nội dung rủi ro, tập prompt bao gồm các nhóm như hành vi bất
+hợp pháp, gian lận, né tránh, lạm dụng mạng, mã độc, thù ghét, quấy rối, phân biệt
+đối xử, thông tin sai lệch, thao túng và một số trường hợp liên quan đến gây hại
+thể chất. Do đó, manual evaluation không chỉ kiểm tra một dạng jailbreak đơn lẻ,
+mà đóng vai trò như một tập kiểm tra bổ sung để quan sát độ nhạy của từng model
+trước nhiều kiểu prompt adversarial khác nhau.
+
+Bảng~\ref{tab:manual-summary} trình bày kết quả tổng hợp theo từng model.
 
 \begin{table}[H]
 \centering
@@ -354,22 +374,37 @@ Bảng~\ref{tab:manual-summary} trình bày kết quả tổng hợp.
 \toprule
 \textbf{Model} & \textbf{Total cases} & \textbf{Passed = 1} & \textbf{Passed = 0} & \textbf{Passed 1 rate} \\
 \midrule
-ChatGPT 5.5              & 31 & 0 & 31 & 0.000 \\
-Claude Haiku 4.5         & 31 & 0 & 31 & 0.000 \\
-Gemini 3.1 Flash Lite    & 31 & 5 & 26 & 0.161 \\
+ChatGPT 5.5           & 31 & 0 & 31 & 0.000 \\
+Claude Haiku 4.5      & 31 & 0 & 31 & 0.000 \\
+Gemini 3.1 Flash Lite & 31 & 5 & 26 & 0.161 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Kết quả manual cho thấy ChatGPT 5.5 và Claude Haiku 4.5 không có trường hợp
-\texttt{Passed = 1} trong bộ dữ liệu thủ công này, trong khi Gemini 3.1 Flash
-Lite có 5 trường hợp được đánh dấu \texttt{Passed = 1}. Tuy nhiên,
-\texttt{\detokenize{Passed_*}} không được tự động diễn giải thành \textit{unsafe compliance},
-\textit{safe refusal} hoặc jailbreak success. Vì vậy, \texttt{\detokenize{passed_1_rate}}
-không được xem là ASR và không được gộp vào các biểu đồ chính.
+Kết quả cho thấy ChatGPT 5.5 và Claude Haiku 4.5 không có trường hợp jailbreak
+thành công trong tập manual này. Cả hai model đều có \texttt{Passed = 1} bằng 0
+trên tổng số 31 case, tương ứng với \texttt{\detokenize{passed_1_rate}} bằng 0.000.
+Ngược lại, Gemini 3.1 Flash Lite có 5 trên tổng số 31 case được đánh dấu
+\texttt{Passed = 1}, tương ứng với \texttt{\detokenize{passed_1_rate}} là 0.161.
+Điều này cho thấy trong tập prompt thủ công, Gemini 3.1 Flash Lite có tỉ lệ
+jailbreak thành công cao hơn hai model còn lại.
 
-Manual evaluation chỉ nên được xem là nguồn kiểm tra bổ sung để hỗ trợ error
-analysis và lựa chọn các case cần đọc thủ công sâu hơn.
+Tuy nhiên, cần phân biệt rõ giữa \texttt{\detokenize{passed_1_rate}} trong manual
+evaluation và ASR trong experiment chính. Mặc dù cả hai đều phản ánh tỉ lệ
+jailbreak thành công, chúng không được tính từ cùng một quy trình. ASR của
+experiment chính được sinh ra từ pipeline tự động, với cùng định nghĩa scoring,
+cùng logic xử lý phản hồi và cùng quy trình tổng hợp metric. Trong khi đó,
+\texttt{\detokenize{passed_1_rate}} của manual evaluation dựa trên nhãn có sẵn
+trong file manual web response. Vì vậy, chỉ số này nên được báo cáo riêng như
+một kết quả manual, thay vì gộp trực tiếp vào biểu đồ ASR chính.
+
+Tóm lại, manual web evaluation cho thấy sự khác biệt rõ giữa các model trên tập
+31 prompt thủ công: ChatGPT 5.5 và Claude Haiku 4.5 không ghi nhận case jailbreak
+thành công, trong khi Gemini 3.1 Flash Lite có 5 case jailbreak thành công. Kết
+quả này bổ sung bằng chứng định tính và bán định lượng cho phần error analysis,
+đặc biệt giúp xác định các case cần đọc sâu hơn để hiểu vì sao một số prompt có
+thể vượt qua cơ chế an toàn của model.
+
 
 \subsection{Tóm tắt phát hiện chính}
 

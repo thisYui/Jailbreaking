@@ -32,20 +32,49 @@ def profile_bar_chart(df: pd.DataFrame, metric: str, ylabel: str, output_name: s
     fig.savefig(REPORT_FIGURE_DIR / output_name, dpi=200)
     plt.close(fig)
 
-
 def safety_utility_tradeoff(df: pd.DataFrame) -> None:
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.scatter(df["utility_rate"], 1 - df["asr"])
-    for _, row in df.iterrows():
-        ax.annotate(
-            f"{row['run_mode']} {row['defense_type']}",
-            (row["utility_rate"], 1 - row["asr"]),
-            fontsize=8,
+    defense_labels = {
+        "no_defense": "No defense",
+        "input_filter": "Input filter",
+        "output_moderation": "Output moderation",
+        "input_output": "Input + output",
+    }
+
+    defense_markers = {
+        "no_defense": "o",
+        "input_filter": "s",
+        "output_moderation": "^",
+        "input_output": "D",
+    }
+
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+
+    for defense_type, group in df.groupby("defense_type"):
+        label = defense_labels.get(defense_type, defense_type.replace("_", " ").title())
+        marker = defense_markers.get(defense_type, "o")
+
+        ax.scatter(
+            group["utility_rate"],
+            1 - group["asr"],
+            s=140,
+            marker=marker,
+            edgecolor="black",
+            linewidth=0.9,
+            label=label,
+            alpha=0.9,
         )
+
+    ax.set_title("Safety–Utility trade-off by defense strategy")
     ax.set_xlabel("Utility rate")
     ax.set_ylabel("Safety rate (1 - ASR)")
-    ax.set_xlim(-0.02, 1.02)
-    ax.set_ylim(-0.02, 1.02)
+
+    # Zoom vào vùng có dữ liệu để dễ đọc hơn
+    ax.set_xlim(0.38, 0.66)
+    ax.set_ylim(0.84, 1.01)
+
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.legend(title="Defense type", loc="lower left", frameon=True)
+
     plt.tight_layout()
     fig.savefig(REPORT_FIGURE_DIR / "safety_utility_tradeoff.png", dpi=200)
     plt.close(fig)
